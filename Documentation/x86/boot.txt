@@ -85,8 +85,8 @@ zImage kernels, typically looks like:
 When using bzImage, the protected-mode kernel was relocated to
 0x100000 ("high memory"), and the kernel real-mode block (boot sector,
 setup, and stack/heap) was made relocatable to any address between
-0x10000 and end of low memory.  Unfortunately, in protocols 2.00 and
-2.01 the 0x90000+ memory range is still used internally by the kernel;
+0x10000 and the end of low memory.  Unfortunately, in protocols 2.00 and
+2.01, the 0x90000+ memory range is still used internally by the kernel;
 the 2.02 protocol resolves that problem.
 
 It is desirable to keep the "memory ceiling" -- the highest point in
@@ -207,8 +207,8 @@ following parameters should be assumed:
 	initrd not supported
 	Real-mode kernel must be located at 0x90000.
 
-Otherwise, the "version" field contains the protocol version,
-e.g. protocol version 2.01 will contain 0x0201 in this field.  When
+Otherwise, the "version" field contains the protocol version; for example,
+protocol version 2.01 is represented by 0x0201 in this field.  When
 setting fields in the header, you must make sure only to set fields
 supported by the protocol version in use.
 
@@ -396,8 +396,8 @@ Protocol:	2.00+
   Bit 5 (write): QUIET_FLAG
 	- If 0, print early messages.
 	- If 1, suppress early messages.
-		This requests to the kernel (decompressor and early
-		kernel) to not write early messages that require
+		This requests the kernel (decompressor and early
+		kernel) not write early messages that require
 		accessing the display hardware directly.
 
   Bit 6 (write): KEEP_SEGMENTS
@@ -538,15 +538,15 @@ Type:		read/modify (reloc)
 Offset/size:	0x230/4
 Protocol:	2.05+ (read), 2.10+ (modify)
 
-  Alignment unit required by the kernel (if relocatable_kernel is
+  The alignment unit required by the kernel (if relocatable_kernel is
   true.)  A relocatable kernel that is loaded at an alignment
   incompatible with the value in this field will be realigned during
   kernel initialization.
 
-  Starting with protocol version 2.10, this reflects the kernel
+  Starting with protocol version 2.10, this field reflects the kernel
   alignment preferred for optimal performance; it is possible for the
   loader to modify this field to permit a lesser alignment.  See the
-  min_alignment and pref_address field below.
+  min_alignment and pref_address fields.
 
 Field name:	relocatable_kernel
 Type:		read (reloc)
@@ -564,7 +564,7 @@ Offset/size:	0x235/1
 Protocol:	2.10+
 
   This field, if nonzero, indicates as a power of two the minimum
-  alignment required, as opposed to preferred, by the kernel to boot.
+  alignment required, as opposed to preferred, for the kernel to boot.
   If a boot loader makes use of this field, it should update the
   kernel_alignment field with the alignment unit desired; typically:
 
@@ -589,11 +589,11 @@ Type:		write (optional, defaults to x86/PC)
 Offset/size:	0x23c/4
 Protocol:	2.07+
 
-  In a paravirtualized environment the hardware low level architectural
-  pieces such as interrupt handling, page table handling, and
-  accessing process control registers needs to be done differently.
+  In a paravirtualized environment the low-level architectural hardware
+  pieces (such as interrupt handling, page table handling, and
+  accessing process control registers) need to be done differently.
 
-  This field allows the bootloader to inform the kernel we are in one
+  This field allows the bootloader to inform the kernel that it is in one
   one of those environments.
 
   0x00000000	The default x86/PC environment
@@ -607,7 +607,7 @@ Type:		write (subarch-dependent)
 Offset/size:	0x240/8
 Protocol:	2.07+
 
-  A pointer to data that is specific to hardware subarch
+  A pointer to data that is specific to a hardware subarchitecture.
   This field is currently unused for the default x86/PC environment,
   do not modify.
 
@@ -638,10 +638,10 @@ Type:		write (special)
 Offset/size:	0x250/8
 Protocol:	2.09+
 
-  The 64-bit physical pointer to NULL terminated single linked list of
-  struct setup_data.  This is used to define a more extensible boot
-  parameters passing mechanism.  The definition of struct setup_data is
-  as follow:
+  A 64-bit physical pointer to point to a NULL-terminated, intrusive,
+  singly-linked list whose nodes are of type "struct setup_data".
+  This is used to define a more extensible mechanism for passing boot
+  parameters.  The definition of struct setup_data is as follows:
 
   struct setup_data {
 	  u64 next;
@@ -650,12 +650,15 @@ Protocol:	2.09+
 	  u8  data[0];
   };
 
-  Where, the next is a 64-bit physical pointer to the next node of
-  linked list, the next field of the last node is 0; the type is used
-  to identify the contents of data; the len is the length of data
-  field; the data holds the real payload.
+  where:
 
-  This list may be modified at a number of points during the bootup
+    "next" is a 64-bit physical pointer that points to the next node of the
+           linked list (the "next" field of the last node is 0).
+    "type" is used to identify the contents of "data".
+    "len"  is the length of the "data".
+    "data" is the real payload.
+
+  This singly-linked list may be modified at a number of points during the bootup
   process.  Therefore, when modifying this list one should always make
   sure to consider the case where the linked list already contains
   entries.
@@ -676,8 +679,8 @@ Field name:	init_size
 Type:		read
 Offset/size:	0x25c/4
 
-  This field indicates the amount of linear contiguous memory starting
-  at the kernel runtime start address that the kernel needs before it
+  This field indicates the amount of linear contiguous memory (starting
+  at the kernel runtime start address) needed before the kernel
   is capable of examining its memory map.  This is not the same thing
   as the total amount of memory the kernel needs to boot, but it can
   be used by a relocating boot loader to help select a safe load
@@ -713,8 +716,8 @@ version 2.06, the maximum was 255 characters.  A string that is too
 long will be automatically truncated by the kernel.
 
 If the boot protocol version is 2.02 or later, the address of the
-kernel command line is given by the header field cmd_line_ptr (see
-above.)  This address can be anywhere between the end of the setup
+kernel command line is given by the header field cmd_line_ptr.
+This address can be anywhere between the end of the setup
 heap and 0xA0000.
 
 If the protocol version is *not* 2.02 or higher, the kernel
@@ -844,11 +847,11 @@ Such a boot loader should enter the following fields in the header:
 
 The 32-bit (non-real-mode) kernel starts at offset (setup_sects+1)*512
 in the kernel file (again, if setup_sects == 0 the real value is 4.)
-It should be loaded at address 0x10000 for Image/zImage kernels and
+It should be loaded at address 0x10000 for Image/zImage kernels and at
 0x100000 for bzImage kernels.
 
 The kernel is a bzImage kernel if the protocol >= 2.00 and the 0x01
-bit (LOAD_HIGH) in the loadflags field is set:
+bit (LOAD_HIGH) is set in the loadflags field:
 
 	is_bzImage = (protocol >= 0x0200) && (loadflags & 0x01);
 	load_address = is_bzImage ? 0x100000 : 0x10000;
@@ -856,7 +859,7 @@ bit (LOAD_HIGH) in the loadflags field is set:
 Note that Image/zImage kernels can be up to 512K in size, and thus use
 the entire 0x10000-0x90000 range of memory.  This means it is pretty
 much a requirement for these kernels to load the real-mode part at
-0x90000.  bzImage kernels allow much more flexibility.
+0x90000; bzImage kernels allow much more flexibility.
 
 
 **** SPECIAL COMMAND LINE OPTIONS
@@ -883,7 +886,7 @@ conflict with actual kernel options now or in the future.
 	(case insensitive) K, M, G, T, P or E (meaning << 10, << 20,
 	<< 30, << 40, << 50 or << 60).  This specifies the end of
 	memory to the kernel.  This affects the possible placement of
-	an initrd, since an initrd should be placed near end of
+	an initrd, since an initrd should be placed near the end of
 	memory.  Note that this is an option to *both* the kernel and
 	the bootloader!
 
@@ -892,7 +895,7 @@ conflict with actual kernel options now or in the future.
 	obviously bootloader-dependent, and some boot loaders
 	(e.g. LILO) do not have such a command.
 
-In addition, some boot loaders add the following options to the
+In addition, some boot loaders allow the following options on the
 user-specified command line:
 
   BOOT_IMAGE=<file>
@@ -938,8 +941,8 @@ In our example from above, we would do:
 	_DS = _ES = _FS = _GS = seg;
 	jmp_far(seg+0x20, 0);	/* Run the kernel */
 
-If your boot sector accesses a floppy drive, it is recommended to
-switch off the floppy motor before running the kernel, since the
+If the boot sector accesses a floppy drive, it is recommended that
+the floppy motor be switched off before running the kernel, because the
 kernel boot leaves interrupts off and thus the motor will not be
 switched off, especially if the loaded kernel has the floppy driver as
 a demand-loaded module!
@@ -951,7 +954,7 @@ If the boot loader runs in a particularly hostile environment (such as
 LOADLIN, which runs under DOS) it may be impossible to follow the
 standard memory location requirements.  Such a boot loader may use the
 following hooks that, if set, are invoked by the kernel at the
-appropriate time.  The use of these hooks should probably be
+appropriate times.  The use of these hooks should probably be
 considered an absolutely last resort!
 
 IMPORTANT: All the hooks are required to preserve %esp, %ebp, %esi and
@@ -963,9 +966,9 @@ IMPORTANT: All the hooks are required to preserve %esp, %ebp, %esi and
 	your routine should probably do so, too.
 
   code32_start:
-	A 32-bit flat-mode routine *jumped* to immediately after the
-	transition to protected mode, but before the kernel is
-	uncompressed.  No segments, except CS, are guaranteed to be
+	A 32-bit flat-mode routine to which control *jumps* immediately
+	after the transition to protected mode, but before the kernel is
+	decompressed.  No segments, except CS, are guaranteed to be
 	set up (current kernels do, but older ones do not); you should
 	set them up to BOOT_DS (0x18) yourself.
 
@@ -977,8 +980,8 @@ IMPORTANT: All the hooks are required to preserve %esp, %ebp, %esi and
 **** 32-bit BOOT PROTOCOL
 
 For machine with some new BIOS other than legacy BIOS, such as EFI,
-LinuxBIOS, etc, and kexec, the 16-bit real mode setup code in kernel
-based on legacy BIOS can not be used, so a 32-bit boot protocol needs
+LinuxBIOS, etc, and kexec, the 16-bit real mode setup code in the kernel
+(based on legacy BIOS) cannot be used, so a 32-bit boot protocol needs
 to be defined.
 
 In 32-bit boot protocol, the first step in loading a Linux kernel
@@ -987,7 +990,7 @@ traditionally known as "zero page"). The memory for struct boot_params
 should be allocated and initialized to all zero. Then the setup header
 from offset 0x01f1 of kernel image on should be loaded into struct
 boot_params and examined. The end of setup header can be calculated as
-follow:
+follows:
 
 	0x0202 + byte value at offset 0x0201
 
@@ -996,8 +999,8 @@ boot_params as that of 16-bit boot protocol, the boot loader should
 also fill the additional fields of the struct boot_params as that
 described in zero-page.txt.
 
-After setupping the struct boot_params, the boot loader can load the
-32/64-bit kernel in the same way as that of 16-bit boot protocol.
+After setting up the struct boot_params, the boot loader can load the
+32/64-bit kernel in the same way as with the 16-bit boot protocol.
 
 In 32-bit boot protocol, the kernel is started by jumping to the
 32-bit kernel entry point, which is the start address of loaded
