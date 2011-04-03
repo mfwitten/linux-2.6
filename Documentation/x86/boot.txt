@@ -903,7 +903,7 @@ user-specified command line:
 	The kernel was booted without explicit user intervention.
 
 If these options are added by the boot loader, it is highly
-recommended that they are located *first*, before the user-specified
+recommended that they be located *first*, before the user-specified
 or configuration-specified command line.  Otherwise, "init=/bin/sh"
 gets confused by the "auto" option.
 
@@ -919,7 +919,7 @@ At entry, ds = es = ss should point to the start of the real-mode
 kernel code (0x9000 if the code is loaded at 0x90000), sp should be
 set up properly, normally pointing to the top of the heap, and
 interrupts should be disabled.  Furthermore, to guard against bugs in
-the kernel, it is recommended that the boot loader sets fs = gs = ds =
+the kernel, it is recommended that the boot loader set fs = gs = ds =
 es = ss.
 
 In our example from above, we would do:
