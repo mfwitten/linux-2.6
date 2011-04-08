@@ -112,13 +112,13 @@ config IPW2200_RADIOTAP
 	depends on IPW2200_MONITOR
 
 config IPW2200_PROMISCUOUS
-	bool "Enable creation of a RF radiotap promiscuous interface"
+	bool "Enable creation of a radiotap promiscuous interface"
 	depends on IPW2200_MONITOR
 	select IPW2200_RADIOTAP
 	---help---
-	  Enables the creation of a second interface prefixed 'rtap'. 
-	  This second interface will provide every received in radiotap
-	  format.
+	  Enables the creation of a second interface (the name of which
+	  is prefixed with 'rtap'), which provides every received frame
+	  in radiotap format.
 
 	  This is useful for performing wireless network analysis while
 	  maintaining an active association.
@@ -129,9 +129,9 @@ config IPW2200_PROMISCUOUS
 	    % ifconfig rtap0 up
 	    % tethereal -i rtap0
 
-	  If you do not specify 'rtap_iface=1' as a module parameter then 
-	  the rtap interface will not be created and you will need to turn 
-	  it on via sysfs:
+	  If you do not specify 'rtap_iface=1' as a module parameter, then
+	  the rtap interface will not be created automatically, but it can
+	  still be created via sysfs:
 
 	    % echo 1 > /sys/bus/pci/drivers/ipw2200/*/rtap_iface
 
