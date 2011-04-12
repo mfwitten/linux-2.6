@@ -105,7 +105,8 @@ zImage or old bzImage kernels, which need data written into the
 above the 0x9A000 point; too many BIOSes break above that point.
 
 For a modern bzImage kernel with boot protocol version >= 2.02, a
-memory layout like the following is suggested:
+memory layout like the following is suggested (the address X is as
+low as the design of the boot loader permits):
 
 	~                        ~
         |  Protected-mode kernel |
@@ -129,9 +130,6 @@ X       +------------------------+
 000600	+------------------------+ 
 	|  BIOS use only	 |
 000000	+------------------------+
-
-... where the address X is as low as the design of the boot loader
-permits.
 
 
 **** THE REAL-MODE KERNEL HEADER
