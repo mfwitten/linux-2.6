@@ -22,7 +22,7 @@ Protocol 2.00:	(Kernel 1.3.73) Added bzImage and initrd support, as
 Protocol 2.01:	(Kernel 1.3.76) Added a heap overrun warning.
 
 Protocol 2.02:	(Kernel 2.4.0-test3-pre3) New command line protocol.
-		Lower the conventional memory ceiling.	No overwrite
+		Lower the conventional memory ceiling.  No overwrite
 		of the traditional setup area, thus making booting
 		safe for systems which use the EBDA from SMM or 32-bit
 		BIOS entry points.  zImage deprecated but still
@@ -48,7 +48,7 @@ Protocol 2.08:	(Kernel 2.6.26) Added crc32 checksum and ELF format
 		fields to aid in locating the payload.
 
 Protocol 2.09:	(Kernel 2.6.26) Added a field of 64-bit physical
-		pointer to single linked list of struct	setup_data.
+		pointer to single linked list of struct setup_data.
 
 Protocol 2.10:	(Kernel 2.6.31) Added a protocol for relaxed alignment
 		beyond the kernel_alignment added, new init_size and
@@ -93,7 +93,7 @@ It is desirable to keep the "memory ceiling" -- the highest point in
 low memory touched by the boot loader -- as low as possible, since
 some newer BIOSes have begun to allocate some rather large amounts of
 memory, called the Extended BIOS Data Area, near the top of low
-memory.	 The boot loader should use the "INT 12h" BIOS call to verify
+memory.  The boot loader should use the "INT 12h" BIOS call to verify
 how much low memory is available.
 
 Unfortunately, if INT 12h reports that the amount of memory is too
@@ -389,7 +389,7 @@ Protocol:	2.00+
 
   This field is a bitmask.
 
-  Bit 0 (read):	LOADED_HIGH
+  Bit 0 (read): LOADED_HIGH
 	- If 0, the protected-mode code is loaded at 0x10000.
 	- If 1, the protected-mode code is loaded at 0x100000.
 
@@ -786,7 +786,7 @@ mode segment:
 
 Such a boot loader should enter the following fields in the header:
 
-	unsigned long base_ptr;	/* base address for real-mode segment */
+	unsigned long base_ptr; /* base address for real-mode segment */
 
 	if ( setup_sects == 0 ) {
 		setup_sects = 4;
@@ -813,7 +813,7 @@ Such a boot loader should enter the following fields in the header:
 			cmd_line_ptr = base_ptr + heap_end;
 			strcpy(cmd_line_ptr, cmdline);
 		} else {
-			cmd_line_magic	= 0xA33F;
+			cmd_line_magic  = 0xA33F;
 			cmd_line_offset = heap_end;
 			setup_move_size = heap_end + strlen(cmdline)+1;
 			strcpy(base_ptr+cmd_line_offset, cmdline);
@@ -823,7 +823,7 @@ Such a boot loader should enter the following fields in the header:
 
 		heap_end = 0x9800;
 
-		cmd_line_magic	= 0xA33F;
+		cmd_line_magic  = 0xA33F;
 		cmd_line_offset = heap_end;
 
 		/* A very old kernel MUST have its real-mode code
@@ -832,7 +832,7 @@ Such a boot loader should enter the following fields in the header:
 		if ( base_ptr != 0x90000 ) {
 			/* Copy the real-mode kernel */
 			memcpy(0x90000, base_ptr, (setup_sects+1)*512);
-			base_ptr = 0x90000;		 /* Relocated */
+			base_ptr = 0x90000;              /* Relocated */
 		}
 
 		strcpy(0x90000+cmd_line_offset, cmdline);
@@ -932,14 +932,14 @@ In our example from above, we would do:
 
 	seg = base_ptr >> 4;
 
-	cli();	/* Enter with interrupts disabled! */
+	cli();  /* Enter with interrupts disabled! */
 
 	/* Set up the real-mode kernel stack */
 	_SS = seg;
 	_SP = heap_end;
 
 	_DS = _ES = _FS = _GS = seg;
-	jmp_far(seg+0x20, 0);	/* Run the kernel */
+	jmp_far(seg+0x20, 0);   /* Run the kernel */
 
 If the boot sector accesses a floppy drive, it is recommended that
 the floppy motor be switched off before running the kernel, because the
