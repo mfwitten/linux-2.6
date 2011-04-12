@@ -82,9 +82,9 @@ zImage kernels typically looks like:
 000000	+------------------------+
 
 
-When using bzImage, the protected-mode kernel was relocated to
+When using bzImage, the protected-mode kernel is relocated to
 0x100000 ("high memory"), and the kernel real-mode block (boot sector,
-setup, and stack/heap) was made relocatable to any address between
+setup, and stack/heap) is made relocatable to any address between
 0x10000 and the end of low memory.  Unfortunately, in protocols 2.00 and
 2.01, the 0x90000+ memory range is still used internally by the kernel;
 the 2.02 protocol resolves that problem.
@@ -102,7 +102,7 @@ error to the user.  The boot loader should therefore be designed to
 take up as little space in low memory as it reasonably can.  For
 zImage or old bzImage kernels, which need data written into the
 0x90000 segment, the boot loader should make sure not to use memory
-above the 0x9A000 point; too many BIOSes will break above that point.
+above the 0x9A000 point; too many BIOSes break above that point.
 
 For a modern bzImage kernel with boot protocol version >= 2.02, a
 memory layout like the following is suggested:
@@ -410,7 +410,7 @@ Protocol:	2.00+
   Bit 7 (write): CAN_USE_HEAP
 	Set this bit to 1 to indicate that the value entered in the
 	heap_end_ptr is valid.  If this field is clear, some setup code
-	functionality will be disabled.
+	functionality is disabled.
 
 Field name:	setup_move_size
 Type:		modify (obligatory)
@@ -442,7 +442,7 @@ Protocol:	2.00+
   1. as a boot loader hook (see ADVANCED BOOT LOADER HOOKS below.)
 
   2. if a bootloader which does not install a hook loads a
-     relocatable kernel at a nonstandard address it will have to modify
+     relocatable kernel at a nonstandard address it must modify
      this field to point to the load address.
 
 Field name:	ramdisk_image
@@ -540,7 +540,7 @@ Protocol:	2.05+ (read), 2.10+ (modify)
 
   The alignment unit required by the kernel (if relocatable_kernel is
   true.)  A relocatable kernel that is loaded at an alignment
-  incompatible with the value in this field will be realigned during
+  incompatible with the value in this field is realigned during
   kernel initialization.
 
   Starting with protocol version 2.10, this field reflects the kernel
@@ -582,7 +582,7 @@ Protocol:	2.06+
   The maximum size of the command line without the terminating
   zero.  This means that the command line can contain at most
   cmdline_size characters.  With protocol version 2.05 and earlier, the
-  maximum size was 255.
+  maximum size is 255.
 
 Field name:	hardware_subarch
 Type:		write (optional, defaults to x86/PC)
@@ -672,7 +672,7 @@ Protocol:	2.10+
   kernel.  A relocating bootloader should attempt to load at this
   address if possible.
 
-  A non-relocatable kernel will unconditionally move itself and to run
+  A non-relocatable kernel unconditionally moves itself to run
   at this address.
 
 Field name:	init_size
@@ -898,11 +898,11 @@ In addition, some boot loaders allow the following options on the
 user-specified command line:
 
   BOOT_IMAGE=<file>
-	The boot image which was loaded.  Again, the meaning of <file>
+	The boot image which is loaded.  Again, the meaning of <file>
 	is obviously bootloader-dependent.
 
   auto
-	The kernel was booted without explicit user intervention.
+	The kernel is booted without explicit user intervention.
 
 If these options are added by the boot loader, it is highly
 recommended that they be located *first* (before the user-specified
@@ -914,7 +914,7 @@ gets confused by the "auto" option.
 
 The kernel is started by jumping to the kernel entry point, which is
 located at *segment* offset 0x20 from the start of the real mode
-kernel.  This means that if you loaded your real-mode kernel code at
+kernel.  This means that if you load your real-mode kernel code at
 0x90000, the kernel entry point is 9020:0000.
 
 At entry, ds = es = ss should point to the start of the real-mode
