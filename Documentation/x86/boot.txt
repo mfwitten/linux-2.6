@@ -97,7 +97,7 @@ memory.  The boot loader should use the "INT 12h" BIOS call to verify
 how much low memory is available.
 
 Unfortunately, if INT 12h reports that the amount of memory is too
-low, there is usually nothing the boot loader can do but to report an
+low, there is usually nothing the boot loader can do but report an
 error to the user.  The boot loader should therefore be designed to
 take up as little space in low memory as it reasonably can.  For
 zImage or old bzImage kernels, which need data written into the
