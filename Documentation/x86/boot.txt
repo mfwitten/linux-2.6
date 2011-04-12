@@ -56,8 +56,8 @@ Protocol 2.10:	(Kernel 2.6.31) Added a protocol for relaxed alignment
 
 **** MEMORY LAYOUT
 
-The traditional memory map for the kernel loader, used for Image or
-zImage kernels, typically looks like:
+The traditional memory map for the kernel loader used for Image or
+zImage kernels typically looks like:
 
 	|			 |
 0A0000	+------------------------+
@@ -92,7 +92,7 @@ the 2.02 protocol resolves that problem.
 It is desirable to keep the "memory ceiling" -- the highest point in
 low memory touched by the boot loader -- as low as possible, since
 some newer BIOSes have begun to allocate some rather large amounts of
-memory, called the Extended BIOS Data Area, near the top of low
+memory (called the Extended BIOS Data Area) near the top of low
 memory.  The boot loader should use the "INT 12h" BIOS call to verify
 how much low memory is available.
 
@@ -274,7 +274,7 @@ Offset/size:	0x1fc/2
 Protocol:	ALL
 
   The default root device device number.  The use of this field is
-  deprecated, use the "root=" option on the command line instead.
+  deprecated; use the "root=" option on the command line instead.
 
 Field name:	boot_flag
 Type:		read
@@ -305,9 +305,9 @@ Type:		read
 Offset/size:	0x206/2
 Protocol:	2.00+
 
-  Contains the boot protocol version, in (major << 8)+minor format,
-  e.g. 0x0204 for version 2.04, and 0x0a11 for a hypothetical version
-  10.17.
+  Contains the boot protocol version in "(major << 8)+minor" format
+  (e.g. 0x0204 for version 2.04 and 0x0a11 for a hypothetical version
+  10.17).
 
 Field name:	realmode_swtch
 Type:		modify (optional)
@@ -556,7 +556,7 @@ Protocol:	2.05+
   If this field is nonzero, the protected-mode part of the kernel can
   be loaded at any address that satisfies the kernel_alignment field.
   After loading, the boot loader must set the code32_start field to
-  point to the loaded code, or to a boot loader hook.
+  point to the loaded code or to a boot loader hook.
 
 Field name:	min_alignment
 Type:		read (reloc)
@@ -564,7 +564,7 @@ Offset/size:	0x235/1
 Protocol:	2.10+
 
   This field, if nonzero, indicates as a power of two the minimum
-  alignment required, as opposed to preferred, for the kernel to boot.
+  alignment required (as opposed to preferred) for the kernel to boot.
   If a boot loader makes use of this field, it should update the
   kernel_alignment field with the alignment unit desired; typically:
 
@@ -707,8 +707,7 @@ sys_size field of the header is always 0.
 
 The kernel command line has become an important way for the boot
 loader to communicate with the kernel.  Some of its options are also
-relevant to the boot loader itself, see "special command line options"
-below.
+relevant to the boot loader itself (see "special command line options").
 
 The kernel command line is a null-terminated string. The maximum
 length can be retrieved from the field cmdline_size.  Before protocol
@@ -856,7 +855,7 @@ bit (LOAD_HIGH) is set in the loadflags field:
 	is_bzImage = (protocol >= 0x0200) && (loadflags & 0x01);
 	load_address = is_bzImage ? 0x100000 : 0x10000;
 
-Note that Image/zImage kernels can be up to 512K in size, and thus use
+Note that Image/zImage kernels can be up to 512K in size and thus use
 the entire 0x10000-0x90000 range of memory.  This means it is pretty
 much a requirement for these kernels to load the real-mode part at
 0x90000; bzImage kernels allow much more flexibility.
@@ -886,7 +885,7 @@ conflict with actual kernel options now or in the future.
 	(case insensitive) K, M, G, T, P or E (meaning << 10, << 20,
 	<< 30, << 40, << 50 or << 60).  This specifies the end of
 	memory to the kernel.  This affects the possible placement of
-	an initrd, since an initrd should be placed near the end of
+	an initrd because an initrd should be placed near the end of
 	memory.  Note that this is an option to *both* the kernel and
 	the bootloader!
 
@@ -906,8 +905,8 @@ user-specified command line:
 	The kernel was booted without explicit user intervention.
 
 If these options are added by the boot loader, it is highly
-recommended that they be located *first*, before the user-specified
-or configuration-specified command line.  Otherwise, "init=/bin/sh"
+recommended that they be located *first* (before the user-specified
+or configuration-specified command line).  Otherwise, "init=/bin/sh"
 gets confused by the "auto" option.
 
 
@@ -967,8 +966,8 @@ IMPORTANT: All the hooks are required to preserve %esp, %ebp, %esi and
 
   code32_start:
 	A 32-bit flat-mode routine to which control *jumps* immediately
-	after the transition to protected mode, but before the kernel is
-	decompressed.  No segments, except CS, are guaranteed to be
+	after the transition to protected mode but before the kernel is
+	decompressed.  No segments (except CS) are guaranteed to be
 	set up (current kernels do, but older ones do not); you should
 	set them up to BOOT_DS (0x18) yourself.
 
