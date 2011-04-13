@@ -31,7 +31,7 @@ Protocol 2.02:	(Kernel 2.4.0-test3-pre3) New command line protocol.
 Protocol 2.03:	(Kernel 2.4.18-pre1) Explicitly makes the highest possible
 		initrd address available to the bootloader.
 
-Protocol 2.04:	(Kernel 2.6.14) Extend the syssize field to four bytes.
+Protocol 2.04:	(Kernel 2.6.14) Extend the sys_size field to four bytes.
 
 Protocol 2.05:	(Kernel 2.6.20) Make protected mode kernel relocatable.
 		Introduce relocatable_kernel and kernel_alignment fields.
@@ -153,7 +153,7 @@ Offset	Proto	Name		Meaning
 
 01F1/1	ALL(1	setup_sects	The size of the setup in sectors
 01F2/2	ALL	root_flags	If set, the root is mounted readonly
-01F4/4	2.04+(2	syssize		The size of the 32-bit code in 16-byte paras
+01F4/4	2.04+(2	sys_size	The size (in 16B paragraphs) of the 32-bit code
 01F8/2	ALL	ram_size	DO NOT USE - for bootsect.S use only
 01FA/2	ALL	vid_mode	Video mode control
 01FC/2	ALL	root_dev	Default root device number
@@ -193,7 +193,7 @@ Offset	Proto	Name		Meaning
 (1) For backwards compatibility, if the setup_sects field contains 0, the
     real value is 4.
 
-(2) For boot protocol prior to 2.04, the upper two bytes of the syssize
+(2) For boot protocol prior to 2.04, the upper two bytes of the sys_size
     field are unusable, which means the size of a bzImage kernel
     cannot be determined.
 
@@ -245,7 +245,7 @@ Protocol:	 ALL
   this field is deprecated; use the "ro" or "rw" options on the
   command line instead.
 
-Field name:	syssize
+Field name:	sys_size
 Type:		read
 Offset/size:	0x1f4/4 (protocol 2.04+) 0x1f4/2 (protocol ALL)
 Protocol:	2.04+
@@ -697,7 +697,7 @@ From boot protocol version 2.08 onwards the CRC-32 is calculated over
 the entire file using the characteristic polynomial 0x04C11DB7 and an
 initial remainder of 0xffffffff.  The checksum is appended to the
 file; therefore the CRC of the file up to the limit specified in the
-syssize field of the header is always 0.
+sys_size field of the header is always 0.
 
 
 **** THE KERNEL COMMAND LINE
