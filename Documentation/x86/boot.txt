@@ -249,8 +249,8 @@ Offset/size:	0x1f4/4 (protocol 2.04+) 0x1f4/2 (protocol ALL)
 Protocol:	2.04+
 
   The size of the protected-mode code in units of 16-byte paragraphs.
-  For protocol versions older than 2.04 this field is only two bytes
-  wide, and therefore cannot be trusted for the size of a kernel if
+  For protocol versions older than 2.04, this field is only two bytes
+  wide and therefore cannot be trusted for the size of a kernel if
   the LOAD_HIGH flag is set.
 
 Field name:	ram_size
@@ -440,7 +440,7 @@ Protocol:	2.00+
   1. as a boot loader hook (see ADVANCED BOOT LOADER HOOKS below.)
 
   2. if a bootloader which does not install a hook loads a
-     relocatable kernel at a nonstandard address it must modify
+     relocatable kernel at a nonstandard address, it must modify
      this field to point to the load address.
 
 Field name:	ramdisk_image
@@ -587,7 +587,7 @@ Type:		write (optional, defaults to x86/PC)
 Offset/size:	0x23c/4
 Protocol:	2.07+
 
-  In a paravirtualized environment the low-level architectural hardware
+  In a paravirtualized environment, the low-level architectural hardware
   pieces (such as interrupt handling, page table handling, and
   accessing process control registers) need to be done differently.
 
@@ -651,13 +651,13 @@ Protocol:	2.09+
   where:
 
     "next" is a 64-bit physical pointer that points to the next node of the
-           linked list (the "next" field of the last node is 0).
+           linked list (the "next" field of the last node is NULL).
     "type" is used to identify the contents of "data".
     "len"  is the length of the "data".
     "data" is the real payload.
 
   This singly-linked list may be modified at a number of points during the bootup
-  process.  Therefore, when modifying this list one should always make
+  process.  Therefore, when modifying this list, one should always make
   sure to consider the case where the linked list already contains
   entries.
 
@@ -694,10 +694,10 @@ Offset/size:	0x25c/4
 
 **** THE IMAGE CHECKSUM
 
-From boot protocol version 2.08 onwards the CRC-32 is calculated over
+From boot protocol version 2.08 onwards, the CRC-32 is calculated over
 the entire file using the characteristic polynomial 0x04C11DB7 and an
 initial remainder of 0xffffffff.  The checksum is appended to the
-file; therefore the CRC of the file up to the limit specified in the
+file; therefore, the CRC of the file up to the limit specified in the
 sys_size field of the header is always 0.
 
 
@@ -880,7 +880,7 @@ conflict with actual kernel options now or in the future.
 	line is parsed.
 
   mem=<size>
-	<size> is an integer in C notation optionally followed by
+	<size> is an integer in C notation, optionally followed by
 	(case insensitive) K, M, G, T, P or E (meaning << 10, << 20,
 	<< 30, << 40, << 50 or << 60).  This specifies the end of
 	memory to the kernel.  This affects the possible placement of
