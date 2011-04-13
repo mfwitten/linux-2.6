@@ -688,9 +688,9 @@ Offset/size:	0x25c/4
   The kernel runtime start address is determined by the following algorithm:
 
   if (relocatable_kernel)
-	runtime_start = align_up(load_address, kernel_alignment)
+	runtime_start = align_up(load_address, kernel_alignment);
   else
-	runtime_start = pref_address
+	runtime_start = pref_address;
 
 
 **** THE IMAGE CHECKSUM
