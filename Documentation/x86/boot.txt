@@ -271,7 +271,7 @@ Type:		modify (optional)
 Offset/size:	0x1fc/2
 Protocol:	ALL
 
-  The default root device device number.  The use of this field is
+  The default device number of the root device.  The use of this field is
   deprecated; use the "root=" option on the command line instead.
 
 Field name:	boot_flag
