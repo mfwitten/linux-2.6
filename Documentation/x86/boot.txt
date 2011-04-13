@@ -431,7 +431,8 @@ Type:		modify (optional, reloc)
 Offset/size:	0x214/4
 Protocol:	2.00+
 
-  The address to jump to in protected mode.  This defaults to the load
+  The address to which control jumps immediately after entering protected
+  mode but before the kernel is decompressed.  This defaults to the load
   address of the kernel, and can be used by the boot loader to
   determine the proper load address.
 
