@@ -219,7 +219,7 @@ for the kernel ("write" fields), and some are both read and write
 fields ("modify" fields).
 
 All general purpose boot loaders should write the fields marked
-(obligatory).  Boot loaders who want to load the kernel at a
+"(obligatory)".  Boot loaders who want to load the kernel at a
 nonstandard address should fill in the fields marked (reloc); other
 boot loaders can ignore those fields.
 
