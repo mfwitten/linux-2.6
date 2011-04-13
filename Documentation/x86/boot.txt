@@ -678,7 +678,7 @@ Field name:	init_size
 Type:		read
 Offset/size:	0x25c/4
 
-  This field indicates the amount of linear contiguous memory (starting
+  This field indicates the amount of contiguous memory (starting
   at the kernel runtime start address) needed before the kernel
   is capable of examining its memory map.  This is not the same thing
   as the total amount of memory the kernel needs to boot, but it can
