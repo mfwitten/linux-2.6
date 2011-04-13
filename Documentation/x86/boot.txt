@@ -326,7 +326,7 @@ Type:		read
 Offset/size:	0x20e/2
 Protocol:	2.00+
 
-  If set to a nonzero value, contains a pointer to a NUL-terminated
+  If set to a nonzero value, it contains a pointer to a NUL-terminated
   human-readable kernel version number string, less 0x200.  This can
   be used to display the kernel version to the user.  This value
   should be less than (0x200*setup_sects).
