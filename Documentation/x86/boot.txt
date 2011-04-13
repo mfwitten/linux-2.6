@@ -188,8 +188,8 @@ Offset	Proto	Name		Meaning
 0258/8	2.10+	pref_address	Preferred loading address
 0260/4	2.10+	init_size	Linear memory required during initialization
 
-(1) For backwards compatibility, if the setup_sects field contains 0, the
-    real value is 4.
+(1) For backwards compatibility, if the setup_sects field contains 0, then
+    it is treated as though the field contained 4.
 
 (2) For boot protocol prior to 2.04, the upper two bytes of the sys_size
     field are unusable, which means the size of a bzImage kernel
@@ -230,8 +230,8 @@ Type:		read
 Offset/size:	0x1f1/1
 Protocol:	ALL
 
-  The size of the setup code in 512-byte sectors.  If this field is
-  0, the real value is 4.  The real-mode code consists of the boot
+  The size of the setup code in 512-byte sectors.  If this field is 0, then
+  it is treated as though it were 4.  The real-mode code consists of the boot
   sector (always one 512-byte sector) plus the setup code.
 
 Field name:	 root_flags
@@ -842,9 +842,10 @@ Such a boot loader should enter the following fields in the header:
 
 **** LOADING THE REST OF THE KERNEL
 
-The 32-bit (non-real-mode) kernel starts at offset (setup_sects+1)*512
-in the kernel file (again, if setup_sects == 0 the real value is 4.)
-It should be loaded at address 0x10000 for Image/zImage kernels and at
+In the kernel file, the protected-mode code starts at offset
+"(setup_sects+1)*512" (or 0xa00 if setup_sects is 0, because
+setup_sects is treated as though it were 4); the code should
+be loaded at address 0x10000 for Image/zImage kernels and at
 0x100000 for bzImage kernels.
 
 The kernel is a bzImage kernel if the protocol >= 2.00 and the 0x01
