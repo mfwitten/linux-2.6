@@ -221,7 +221,7 @@ fields ("modify" fields).
 All general purpose boot loaders should write the fields marked
 "(obligatory)".  Boot loaders that want to load the kernel at a
 nonstandard address should fill in the fields marked "(reloc)"; other
-boot loaders can ignore those fields.
+boot loaders may ignore those fields.
 
 The byte order of all fields is littleendian (this is x86, after all.)
 
@@ -423,7 +423,7 @@ Protocol:	2.00-2.01
 
   The unit is bytes starting with the beginning of the boot sector.
   
-  This field is can be ignored when the protocol is 2.02 or higher, or
+  This field may be ignored when the protocol is 2.02 or higher, or
   if the real-mode code is loaded at 0x90000.
 
 Field name:	code32_start
@@ -551,7 +551,7 @@ Type:		read (reloc)
 Offset/size:	0x234/1
 Protocol:	2.05+
 
-  If this field is nonzero, the protected-mode part of the kernel can
+  If this field is nonzero, the protected-mode part of the kernel may
   be loaded at any address that satisfies the kernel_alignment field.
   After loading, the boot loader must set the code32_start field to
   point to the loaded code or to a boot loader hook.
@@ -578,7 +578,7 @@ Offset/size:	0x238/4
 Protocol:	2.06+
 
   The maximum size of the command line without the terminating
-  zero.  This means that the command line can contain at most
+  zero.  This means that the command line may contain at most
   cmdline_size characters.  With protocol version 2.05 and earlier, the
   maximum size is 255.
 
@@ -749,7 +749,7 @@ segment has to be used:
 	- When loading a 2.01 or earlier boot protocol kernel.
 
 	  -> For the 2.00 and 2.01 boot protocols, the real-mode code
-	     can be loaded at another address, but it is internally
+	     may be loaded at another address, but it is internally
 	     relocated to 0x90000.  For the "old" protocol, the
 	     real-mode code must be loaded at 0x90000.
 
@@ -854,7 +854,7 @@ bit (LOAD_HIGH) is set in the loadflags field:
 	is_bzImage = (protocol >= 0x0200) && (loadflags & 0x01);
 	load_address = is_bzImage ? 0x100000 : 0x10000;
 
-Note that Image/zImage kernels can be up to 512K in size and thus use
+Note that Image/zImage kernels may be up to 512K in size and thus use
 the entire 0x10000-0x90000 range of memory.  This means it is pretty
 much a requirement for these kernels to load the real-mode part at
 0x90000; bzImage kernels allow much more flexibility.
