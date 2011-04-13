@@ -213,10 +213,10 @@ supported by the protocol version in use.
 
 **** DETAILS OF HEADER FIELDS
 
-For each field, some are information from the kernel to the bootloader
-("read"), some are expected to be filled out by the bootloader
-("write"), and some are expected to be read and modified by the
-bootloader ("modify").
+Some fields provide information from the kernel for the bootloader
+("read" fields), some fields provide information from the bootloader
+for the kernel ("write" fields), and some are both read and write
+fields ("modify" fields).
 
 All general purpose boot loaders should write the fields marked
 (obligatory).  Boot loaders who want to load the kernel at a
