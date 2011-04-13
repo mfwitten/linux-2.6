@@ -312,7 +312,7 @@ Type:		modify (optional)
 Offset/size:	0x208/4
 Protocol:	2.00+
 
-  Boot loader hook (see ADVANCED BOOT LOADER HOOKS below.)
+  Boot loader hook (see ADVANCED BOOT LOADER HOOKS below).
 
 Field name:	start_sys_seg
 Type:		read
