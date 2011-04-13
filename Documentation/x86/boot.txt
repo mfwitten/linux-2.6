@@ -565,7 +565,7 @@ Protocol:	2.10+
   This field, if nonzero, indicates as a power of two the minimum
   alignment required (as opposed to preferred) for the kernel to boot.
   If a boot loader makes use of this field, it should update the
-  kernel_alignment field with the alignment unit desired; typically:
+  kernel_alignment field with the alignment unit desired, typically:
 
 	kernel_alignment = 1 << min_alignment
 
