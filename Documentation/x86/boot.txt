@@ -708,10 +708,11 @@ The kernel command line has become an important way for the boot
 loader to communicate with the kernel.  Some of its options are also
 relevant to the boot loader itself (see "special command line options").
 
-The kernel command line is a null-terminated string. The maximum
-length can be retrieved from the field cmdline_size.  Before protocol
-version 2.06, the maximum was 255 characters.  A string that is too
-long will be automatically truncated by the kernel.
+The kernel command line is a null-terminated string, the maximum length
+of which (excluding the terminating null character) can be retrieved
+from the field cmdline_size.  For protocols prior to version 2.06, the
+maximum is 255 characters; a string that is too long is automatically
+truncated.
 
 If the boot protocol version is 2.02 or later, the address of the
 kernel command line is given by the header field cmd_line_ptr.
@@ -731,7 +732,6 @@ command line is entered using the following protocol:
 	The kernel command line *must* be within the memory region
 	covered by setup_move_size, so you may need to adjust this
 	field.
-
 
 **** MEMORY LAYOUT OF THE REAL-MODE CODE
 
