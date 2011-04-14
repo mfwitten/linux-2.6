@@ -85,7 +85,7 @@ zImage kernels, typically looks like:
 When using bzImage, the protected-mode kernel was relocated to
 0x100000 ("high memory"), and the kernel real-mode block (boot sector,
 setup, and stack/heap) was made relocatable to any address between
-0x10000 and end of low memory. Unfortunately, in protocols 2.00 and
+0x10000 and end of low memory.  Unfortunately, in protocols 2.00 and
 2.01 the 0x90000+ memory range is still used internally by the kernel;
 the 2.02 protocol resolves that problem.
 
@@ -580,8 +580,8 @@ Offset/size:	0x238/4
 Protocol:	2.06+
 
   The maximum size of the command line without the terminating
-  zero. This means that the command line can contain at most
-  cmdline_size characters. With protocol version 2.05 and earlier, the
+  zero.  This means that the command line can contain at most
+  cmdline_size characters.  With protocol version 2.05 and earlier, the
   maximum size was 255.
 
 Field name:	hardware_subarch
@@ -619,7 +619,7 @@ Protocol:	2.08+
   If non-zero then this field contains the offset from the beginning
   of the protected-mode code to the payload.
 
-  The payload may be compressed. The format of both the compressed and
+  The payload may be compressed.  The format of both the compressed and
   uncompressed data should be determined using the standard magic
   numbers.  The currently supported compression formats are gzip
   (magic numbers 1F 8B or 1F 9E), bzip2 (magic number 42 5A), LZMA
@@ -639,8 +639,8 @@ Offset/size:	0x250/8
 Protocol:	2.09+
 
   The 64-bit physical pointer to NULL terminated single linked list of
-  struct setup_data. This is used to define a more extensible boot
-  parameters passing mechanism. The definition of struct setup_data is
+  struct setup_data.  This is used to define a more extensible boot
+  parameters passing mechanism.  The definition of struct setup_data is
   as follow:
 
   struct setup_data {
@@ -882,7 +882,7 @@ conflict with actual kernel options now or in the future.
 	<size> is an integer in C notation optionally followed by
 	(case insensitive) K, M, G, T, P or E (meaning << 10, << 20,
 	<< 30, << 40, << 50 or << 60).  This specifies the end of
-	memory to the kernel. This affects the possible placement of
+	memory to the kernel.  This affects the possible placement of
 	an initrd, since an initrd should be placed near end of
 	memory.  Note that this is an option to *both* the kernel and
 	the bootloader!
