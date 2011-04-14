@@ -767,18 +767,18 @@ code nor in high memory.
 
 **** SAMPLE BOOT CONFIGURATION
 
-As a sample configuration, assume the following layout of the real
-mode segment:
+As a sample configuration, assume the following layout of the real-mode
+segment:
 
     When loading below 0x90000, use the entire segment:
 
-	0x0000-0x7fff	Real mode kernel
+	0x0000-0x7fff	Real-mode kernel
 	0x8000-0xdfff	Stack and heap
 	0xe000-0xffff	Kernel command line
 
     When loading at 0x90000 OR the protocol version is 2.01 or earlier:
 
-	0x0000-0x7fff	Real mode kernel
+	0x0000-0x7fff	Real-mode kernel
 	0x8000-0x97ff	Stack and heap
 	0x9800-0x9fff	Kernel command line
 
@@ -913,7 +913,7 @@ gets confused by the "auto" option.
 **** RUNNING THE KERNEL
 
 The kernel is started by jumping to the kernel entry point, which is
-located at *segment* offset 0x20 from the start of the real mode
+located at *segment* offset 0x20 from the start of the real-mode
 kernel.  This means that if you load your real-mode kernel code at
 0x90000, the kernel entry point is 9020:0000.
 
@@ -960,7 +960,7 @@ IMPORTANT: All the hooks are required to preserve %esp, %ebp, %esi and
 %edi across invocation.
 
   realmode_swtch:
-	A 16-bit real mode far subroutine invoked immediately before
+	A 16-bit real-mode far subroutine invoked immediately before
 	entering protected mode.  The default routine disables NMI, so
 	your routine should probably do so, too.
 
