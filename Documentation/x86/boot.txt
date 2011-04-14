@@ -735,9 +735,9 @@ command line is entered using the following protocol:
 
 **** MEMORY LAYOUT OF THE REAL-MODE CODE
 
-The real-mode code requires a stack/heap to be set up, as well as
-memory allocated for the kernel command line.  This needs to be done
-in the real-mode accessible memory in bottom megabyte.
+The real-mode code requires that memory be allocated for both a stack/heap
+and the kernel command line; the allocated memory needs to be accessible
+while in real mode (basically, it needs to be within the bottom mebibyte).
 
 It should be noted that modern machines often have a sizable Extended
 BIOS Data Area (EBDA).  As a result, it is advisable to use as little
