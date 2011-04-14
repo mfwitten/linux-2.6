@@ -741,7 +741,7 @@ while in real mode (basically, it needs to be within the bottom mebibyte).
 
 It should be noted that modern machines often have a sizable Extended
 BIOS Data Area (EBDA).  As a result, it is advisable to use as little
-of the low megabyte as possible.
+of the bottom mebibyte as possible.
 
 Unfortunately, under the following circumstances the 0x90000 memory
 segment has to be used:
@@ -757,8 +757,8 @@ segment has to be used:
 When loading at 0x90000, avoid using memory above 0x9a000.
 
 For boot protocol 2.02 or higher, the command line does not have to be
-located in the same 64K segment as the real-mode setup code; it is
-thus permitted to give the stack/heap the full 64K segment and locate
+located in the same 64KiB segment as the real-mode setup code; it is
+thus permitted to give the stack/heap the full 64KiB segment and locate
 the command line above it.
 
 The kernel command line should not be located below the real-mode
@@ -855,7 +855,7 @@ bit (LOAD_HIGH) is set in the loadflags field:
 	is_bzImage = (protocol >= 0x0200) && (loadflags & 0x01);
 	load_address = is_bzImage ? 0x100000 : 0x10000;
 
-Note that Image/zImage kernels may be up to 512K in size and thus use
+Note that Image/zImage kernels may be up to 512KiB in size and thus use
 the entire 0x10000-0x90000 range of memory.  This means it is pretty
 much a requirement for these kernels to load the real-mode part at
 0x90000; bzImage kernels allow much more flexibility.
