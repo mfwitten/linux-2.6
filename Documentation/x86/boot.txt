@@ -761,8 +761,8 @@ located in the same 64KiB segment as the real-mode setup code; it is
 thus permitted to give the stack/heap the full 64KiB segment and locate
 the command line above it.
 
-The kernel command line should not be located below the real-mode
-code, nor should it be located in high memory.
+The kernel command line should be located neither below the real-mode
+code nor in high memory.
 
 
 **** SAMPLE BOOT CONFIGURATION
