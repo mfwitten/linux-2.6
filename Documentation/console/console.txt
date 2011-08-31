@@ -1,144 +1,178 @@
 Console Drivers
 ===============
 
-The linux kernel has 2 general types of console drivers.  The first type is
-assigned by the kernel to all the virtual consoles during the boot process.
-This type will be called 'system driver', and only one system driver is allowed
-to exist. The system driver is persistent and it can never be unloaded, though
-it may become inactive.
+The linux kernel has 2 general types of console driver.
 
-The second type has to be explicitly loaded and unloaded. This will be called
-'modular driver' by this document. Multiple modular drivers can coexist at
-any time with each driver sharing the console with other drivers including
-the system driver. However, modular drivers cannot take over the console
-that is currently occupied by another modular driver. (Exception: Drivers that
-call take_over_console() will succeed in the takeover regardless of the type
-of driver occupying the consoles.) They can only take over the console that is
-occupied by the system driver. In the same token, if the modular driver is
-released by the console, the system driver will take over.
+  System driver
+  -------------
+  The driver of this type is bound to all virtual consoles during the boot
+  process.  Only one system driver is allowed to be registered; the system
+  driver is persistent and it may never be unregistered, though it may become
+  unbound from any virtual console.
 
-Modular drivers, from the programmer's point of view, has to call:
+  Modular driver
+  --------------
+  A driver of this type must be explicitly registered, bound, unbound, and
+  unregistered.
 
-	 take_over_console() - load and bind driver to console layer
-	 give_up_console() - unbind and unload driver
+  NOTE: The ability to bind and unbind a modular driver must be enabled
+  when configuring the kernel:
 
-In newer kernels, the following are also available:
+    Device Drivers
+      |
+      +-> Character devices
+            |
+            +-> Support for binding and unbinding console drivers
 
-	 register_con_driver()
-	 unregister_con_driver()
-
-If sysfs is enabled, the contents of /sys/class/vtconsole can be
-examined. This shows the console backends currently registered by the
-system which are named vtcon<n> where <n> is an integer from 0 to 15. Thus:
-
-       ls /sys/class/vtconsole
-       .  ..  vtcon0  vtcon1
-
-Each directory in /sys/class/vtconsole has 3 files:
-
-     ls /sys/class/vtconsole/vtcon0
-     .  ..  bind  name  uevent
-
-What do these files signify?
-
-     1. bind - this is a read/write file. It shows the status of the driver if
-        read, or acts to bind or unbind the driver to the virtual consoles
-        when written to. The possible values are:
-
-	0 - means the driver is not bound and if echo'ed, commands the driver
-	    to unbind
-
-        1 - means the driver is bound and if echo'ed, commands the driver to
-	    bind
-
-     2. name - read-only file. Shows the name of the driver in this format:
-
-	cat /sys/class/vtconsole/vtcon0/name
-	(S) VGA+
-
-	    '(S)' stands for a (S)ystem driver, ie, it cannot be directly
-	    commanded to bind or unbind
-
-	    'VGA+' is the name of the driver
-
-	cat /sys/class/vtconsole/vtcon1/name
-	(M) frame buffer device
-
-	    In this case, '(M)' stands for a (M)odular driver, one that can be
-	    directly commanded to bind or unbind.
-
-     3. uevent - ignore this file
-
-When unbinding, the modular driver is detached first, and then the system
-driver takes over the consoles vacated by the driver. Binding, on the other
-hand, will bind the driver to the consoles that are currently occupied by a
-system driver.
-
-NOTE1: Binding and unbinding must be selected in Kconfig. It's under:
-
-Device Drivers -> Character devices -> Support for binding and unbinding
-console drivers
-
-NOTE2: If any of the virtual consoles are in KD_GRAPHICS mode, then binding or
-unbinding will not succeed. An example of an application that sets the console
-to KD_GRAPHICS is X.
-
-How useful is this feature? This is very useful for console driver
-developers. By unbinding the driver from the console layer, one can unload the
-driver, make changes, recompile, reload and rebind the driver without any need
-for rebooting the kernel. For regular users who may want to switch from
-framebuffer console to VGA console and vice versa, this feature also makes
-this possible. (NOTE NOTE NOTE: Please read fbcon.txt under Documentation/fb
-for more details).
-
-Notes for developers:
+Binding and Unbinding
 =====================
 
-take_over_console() is now broken up into:
+Multiple drivers may be simultaneously registered with the virtual terminal
+layer.  However, only one driver may be bound to a particular virtual console
+at a given time, as described by the following rules:
 
-     register_con_driver()
-     bind_con_driver() - private function
+  * When no driver is bound to a particular virtual console, then the system
+    driver is automatically bound to it.
 
-give_up_console() is a wrapper to unregister_con_driver(), and a driver must
-be fully unbound for this call to succeed. con_is_bound() will check if the
-driver is bound or not.
+  * When the system driver is bound to a particular virtual console, then
+    binding a modular driver to that virtual console automatically unbinds
+    the system driver first, thereby allowing the modular driver to be bound
+    to it.
 
-Guidelines for console driver writers:
-=====================================
+  * Usually, it is necessary to unbind one modular driver before binding
+    another modular driver to the same virtual console.
 
-In order for binding to and unbinding from the console to properly work,
-console drivers must follow these guidelines:
+  * If a driver is bound to any virtual console that is in KD_GRAPHICS mode,
+    then binding and unbinding that driver will not succeed; the X Window
+    System is an example of an application that sets the console to
+    KD_GRAPHICS mode.
 
-1. All drivers, except system drivers, must call either register_con_driver()
-   or take_over_console(). register_con_driver() will just add the driver to
-   the console's internal list. It won't take over the
-   console. take_over_console(), as it name implies, will also take over (or
-   bind to) the console.
+The ability to register, bind, unbind, and unregister a console driver is
+mainly useful to developers; a driver in development could be unbound from
+the virtual console(s), unregistered, rebuilt from source, reregistered,
+and rebound to the virtual console(s) without any need for rebooting the
+kernel.  Of course, end users may use this feature e.g. to switch between a
+framebuffer console driver and a VGA console driver (please read fbcon.txt
+under Documentation/fb for more details).
 
-2. All resources allocated during con->con_init() must be released in
-   con->con_deinit().
+The sysfs Interface
+===================
 
-3. All resources allocated in con->con_startup() must be released when the
-   driver, which was previously bound, becomes unbound.  The console layer
-   does not have a complementary call to con->con_startup() so it's up to the
-   driver to check when it's legal to release these resources. Calling
-   con_is_bound() in con->con_deinit() will help.  If the call returned
-   false(), then it's safe to release the resources.  This balance has to be
-   ensured because con->con_startup() can be called again when a request to
-   rebind the driver to the console arrives.
+It is intended that modern drivers may only be bound to the virtual console(s)
+and unbound through a sysfs interface.
 
-4. Upon exit of the driver, ensure that the driver is totally unbound. If the
-   condition is satisfied, then the driver must call unregister_con_driver()
-   or give_up_console().
+When sysfs is enabled, the directory /sys/class/vtconsole/ contains one
+subdirectory for each registered console driver; these subdirectories are
+named vtcon<n>, where <n> is an integer from 0 to 15.  Thus:
 
-5. unregister_con_driver() can also be called on conditions which make it
-   impossible for the driver to service console requests.  This can happen
-   with the framebuffer console that suddenly lost all of its drivers.
+  $ ls /sys/class/vtconsole
+  .  ..  vtcon0  vtcon1
 
-The current crop of console drivers should still work correctly, but binding
-and unbinding them may cause problems. With minimal fixes, these drivers can
-be made to work correctly.
+Each such subdirectory has at least 3 noteworthy files:
+
+  $ ls /sys/class/vtconsole/vtcon0
+  .  ..  bind  name  uevent
+
+Specifically:
+
+  bind (read/write)
+  -----------------
+  It shows the status of the driver when read, or acts to bind or unbind the
+  driver to the virtual console(s) when written to.  The possible values are:
+
+    0: When read, it means the driver is unbound from all virtual consoles.
+       When written, it commands the virtual terminal layer to unbind the
+       driver from all virtual consoles to which it is bound.
+
+    1: When read, it means the driver is bound to at least one virtual
+       console.  When written, it commands the virtual terminal layer
+       to attempt to bind the driver to some predetermined range of virtual
+       consoles; ultimately, the driver is only bound to those virtual
+       consoles for which binding is allowed, as per the aformentioned rules.
+
+  name (read-only)
+  ----------------
+  It shows the name of the driver, using this format:
+
+    (<type>) <name>
+
+  where <type> may be 'S' for 'system driver' or 'M' for 'modular driver',
+  and <name> may be some arbitrary string.  For example:
+
+    $ cat /sys/class/vtconsole/vtcon0/name
+    (S) VGA+
+    $ cat /sys/class/vtconsole/vtcon1/name
+    (M) frame buffer device
+
+  uevent
+  ------
+  Ignore this file.
+
+Notes for Developers
+====================
+
+Traditionally, a modular driver is set up and torn down with the following
+functions:
+
+  * take_over_console() /* Register and forcibly bind the driver. */
+  * give_up_console()   /* Unregister the driver. */
+
+For backwards compatibility, a call to the function take_over_console() first
+automatically unbinds any (possibly modular) driver that is currently bound to
+the conflicting virtual console(s), and then binds the provided console driver
+to the virtual console(s) in question; this is the only public interface
+outside of sysfs for controlling the binding and unbinding of drivers.
+
+In order for give_up_console() to succeed, the provided driver must be unbound
+from all virtual consoles; con_is_bound() may be used to determine whether
+the provided driver is bound to any virtual console.
+
+With newer kernels, a driver should only be registered and unregistered with
+the following (leaving binding and unbinding to the sysfs interface):
+
+  * register_con_driver()   /* Register the driver. */
+  * unregister_con_driver() /* Unregister the driver. */
+
+In fact, give_up_console() is an alias for unregister_con_driver(), and
+take_over_console() is now implemented with calls to:
+
+  * register_con_driver()
+  * bind_con_driver()     /* This is a private function. */
+
+In order for binding and unbinding to work properly, console drivers must
+follow these guidelines:
+
+  * All modular drivers must call either register_con_driver() or
+    take_over_console().
+
+  * All resources allocated by con->con_init() must be release by
+    con->con_deinit().
+
+  * All resources allocated by con->con_startup() must be released
+    when the driver is unbound from all virtual consoles after having
+    been previously bound to at least one virtual console.
+
+    This balance must be ensured because con->con_startup() might be
+    called again when another request arrives to bind the driver to a
+    virtual console once more.
+
+    Unlike con->con_init(), there is no complement to con->con_startup()
+    for the explicit purpose of such releasing; consequently, it's up
+    to the driver to check when it may do so safely. For instance, a
+    driver may call con_is_bound() in con->con_deinit(), releasing the
+    resources if the result is false.
+
+  * Before exiting, a driver must ensure that it is unregistered
+    via a call to either unregister_con_driver() or give_up_console();
+    note that these calls to these functions only succeed if the driver
+    is already unbound from all virtual consoles.
+
+  * unregister_con_driver() may also be called under any condition
+    that makes it impossible for the driver to service console requests.
+
+Older console drivers should still work correctly, but binding and unbinding
+them may cause problems.  With minimal fixes, these drivers could be made to
+work correctly.
 
 ==========================
-Antonino Daplas <adaplas@pol.net>
-
+Originally written by Antonino Daplas <adaplas@pol.net>
