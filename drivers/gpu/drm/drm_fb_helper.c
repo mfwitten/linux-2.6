@@ -888,7 +888,6 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	int i;
 	struct fb_info *info;
 	struct drm_fb_helper_surface_size sizes;
-	int gamma_size = 0;
 
 	memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
 	sizes.surface_depth = 24;
@@ -938,8 +937,6 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 		desired_mode = fb_helper->crtc_info[i].desired_mode;
 
 		if (desired_mode) {
-			if (gamma_size == 0)
-				gamma_size = fb_helper->crtc_info[i].mode_set.crtc->gamma_size;
 			if (desired_mode->hdisplay < sizes.fb_width)
 				sizes.fb_width = desired_mode->hdisplay;
 			if (desired_mode->vdisplay < sizes.fb_height)
