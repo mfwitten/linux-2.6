@@ -87,7 +87,7 @@ static const struct file_operations drm_proc_fops = {
  * \return Zero on success, non-zero on failure
  *
  * Create a given set of proc files represented by an array of
- * gdm_proc_lists in the given root directory.
+ * drm_proc_lists in the given root directory.
  */
 static int drm_proc_create_files(const struct drm_info_list *files, int count,
 			  struct proc_dir_entry *root, struct drm_minor *minor)
