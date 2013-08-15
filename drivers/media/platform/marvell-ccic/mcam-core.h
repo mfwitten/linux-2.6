@@ -8,6 +8,7 @@
 
 #include <linux/list.h>
 #include <media/v4l2-common.h>
+#include <media/v4l2-ctrls.h>
 #include <media/v4l2-dev.h>
 #include <media/videobuf2-core.h>
 
@@ -15,15 +16,15 @@
  * Create our own symbols for the supported buffer modes, but, for now,
  * base them entirely on which videobuf2 options have been selected.
  */
-#if defined(CONFIG_VIDEOBUF2_VMALLOC) || defined(CONFIG_VIDEOBUF2_VMALLOC_MODULE)
+#if IS_ENABLED(CONFIG_VIDEOBUF2_VMALLOC)
 #define MCAM_MODE_VMALLOC 1
 #endif
 
-#if defined(CONFIG_VIDEOBUF2_DMA_CONTIG) || defined(CONFIG_VIDEOBUF2_DMA_CONTIG_MODULE)
+#if IS_ENABLED(CONFIG_VIDEOBUF2_DMA_CONTIG)
 #define MCAM_MODE_DMA_CONTIG 1
 #endif
 
-#if defined(CONFIG_VIDEOBUF2_DMA_SG) || defined(CONFIG_VIDEOBUF2_DMA_SG_MODULE)
+#if IS_ENABLED(CONFIG_VIDEOBUF2_DMA_SG)
 #define MCAM_MODE_DMA_SG 1
 #endif
 
@@ -52,6 +53,11 @@ enum mcam_buffer_mode {
 	B_DMA_sg = 2
 };
 
+enum mcam_chip_id {
+	MCAM_CAFE,
+	MCAM_ARMADA610,
+};
+
 /*
  * Is a given buffer mode supported by the current kernel configuration?
  */
@@ -73,6 +79,14 @@ static inline int mcam_buffer_mode_supported(enum mcam_buffer_mode mode)
 	}
 }
 
+/*
+ * Basic frame states
+ */
+struct mcam_frame_state {
+	unsigned int frames;
+	unsigned int singles;
+	unsigned int delivered;
+};
 
 /*
  * A description of one of our devices.
@@ -87,9 +101,10 @@ struct mcam_camera {
 	 */
 	struct i2c_adapter *i2c_adapter;
 	unsigned char __iomem *regs;
+	unsigned regs_size; /* size in bytes of the register space */
 	spinlock_t dev_lock;
 	struct device *dev; /* For messages, dma alloc */
-	unsigned int chip_id;
+	enum mcam_chip_id chip_id;
 	short int clock_speed;	/* Sensor clock speed, default 30 */
 	short int use_smbus;	/* SMBUS or straight I2c? */
 	enum mcam_buffer_mode buffer_mode;
@@ -104,10 +119,12 @@ struct mcam_camera {
 	 * should not be touched by the platform code.
 	 */
 	struct v4l2_device v4l2_dev;
+	struct v4l2_ctrl_handler ctrl_handler;
 	enum mcam_state state;
 	unsigned long flags;		/* Buffer status, mainly (dev_lock) */
 	int users;			/* How many open FDs */
 
+	struct mcam_frame_state frame_state;	/* Frame state counter */
 	/*
 	 * Subsystem structures.
 	 */
@@ -141,7 +158,6 @@ struct mcam_camera {
 	void (*frame_complete)(struct mcam_camera *cam, int frame);
 
 	/* Current operating parameters */
-	u32 sensor_type;		/* Currently ov7670 only */
 	struct v4l2_pix_format pix_format;
 	enum v4l2_mbus_pixelcode mbus_code;
 

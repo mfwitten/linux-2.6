@@ -22,20 +22,13 @@
 #include <linux/videodev2.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
-#include <media/v4l2-chip-ident.h>
+#include <media/v4l2-ctrls.h>
 #include <media/ov7670.h>
 #include <media/videobuf2-vmalloc.h>
 #include <media/videobuf2-dma-contig.h>
 #include <media/videobuf2-dma-sg.h>
 
 #include "mcam-core.h"
-
-/*
- * Basic frame stats - to be deleted shortly
- */
-static int frames;
-static int singles;
-static int delivered;
 
 #ifdef MCAM_MODE_VMALLOC
 /*
@@ -342,7 +335,7 @@ static void mcam_ctlr_dma_vmalloc(struct mcam_camera *cam)
 		mcam_reg_clear_bit(cam, REG_CTRL1, C1_TWOBUFS);
 	} else
 		mcam_reg_set_bit(cam, REG_CTRL1, C1_TWOBUFS);
-	if (cam->chip_id == V4L2_IDENT_CAFE)
+	if (cam->chip_id == MCAM_CAFE)
 		mcam_reg_write(cam, REG_UBAR, 0); /* 32 bits only */
 }
 
@@ -367,10 +360,10 @@ static void mcam_frame_tasklet(unsigned long data)
 		if (!test_bit(bufno, &cam->flags))
 			continue;
 		if (list_empty(&cam->buffers)) {
-			singles++;
+			cam->frame_state.singles++;
 			break;  /* Leave it valid, hope for better later */
 		}
-		delivered++;
+		cam->frame_state.delivered++;
 		clear_bit(bufno, &cam->flags);
 		buf = list_first_entry(&cam->buffers, struct mcam_vb_buffer,
 				queue);
@@ -452,7 +445,7 @@ static void mcam_set_contig_buffer(struct mcam_camera *cam, int frame)
 		mcam_reg_write(cam, frame == 0 ? REG_Y0BAR : REG_Y1BAR,
 				vb2_dma_contig_plane_dma_addr(&buf->vb_buf, 0));
 		set_bit(CF_SINGLE_BUFFER, &cam->flags);
-		singles++;
+		cam->frame_state.singles++;
 		return;
 	}
 	/*
@@ -485,7 +478,7 @@ static void mcam_dma_contig_done(struct mcam_camera *cam, int frame)
 	struct mcam_vb_buffer *buf = cam->vb_bufs[frame];
 
 	if (!test_bit(CF_SINGLE_BUFFER, &cam->flags)) {
-		delivered++;
+		cam->frame_state.delivered++;
 		mcam_buffer_done(cam, frame, &buf->vb_buf);
 	}
 	mcam_set_contig_buffer(cam, frame);
@@ -578,13 +571,13 @@ static void mcam_dma_sg_done(struct mcam_camera *cam, int frame)
 	 */
 	} else {
 		set_bit(CF_SG_RESTART, &cam->flags);
-		singles++;
+		cam->frame_state.singles++;
 		cam->vb_bufs[0] = NULL;
 	}
 	/*
 	 * Now we can give the completed frame back to user space.
 	 */
-	delivered++;
+	cam->frame_state.delivered++;
 	mcam_buffer_done(cam, frame, &buf->vb_buf);
 }
 
@@ -802,7 +795,6 @@ static int __mcam_cam_reset(struct mcam_camera *cam)
  */
 static int mcam_cam_init(struct mcam_camera *cam)
 {
-	struct v4l2_dbg_chip_ident chip;
 	int ret;
 
 	mutex_lock(&cam->s_mutex);
@@ -810,24 +802,8 @@ static int mcam_cam_init(struct mcam_camera *cam)
 		cam_warn(cam, "Cam init with device in funky state %d",
 				cam->state);
 	ret = __mcam_cam_reset(cam);
-	if (ret)
-		goto out;
-	chip.ident = V4L2_IDENT_NONE;
-	chip.match.type = V4L2_CHIP_MATCH_I2C_ADDR;
-	chip.match.addr = cam->sensor_addr;
-	ret = sensor_call(cam, core, g_chip_ident, &chip);
-	if (ret)
-		goto out;
-	cam->sensor_type = chip.ident;
-	if (cam->sensor_type != V4L2_IDENT_OV7670) {
-		cam_err(cam, "Unsupported sensor type 0x%x", cam->sensor_type);
-		ret = -EINVAL;
-		goto out;
-	}
-/* Get/set parameters? */
-	ret = 0;
+	/* Get/set parameters? */
 	cam->state = S_IDLE;
-out:
 	mcam_ctlr_power_down(cam);
 	mutex_unlock(&cam->s_mutex);
 	return ret;
@@ -1232,47 +1208,6 @@ static int mcam_vidioc_dqbuf(struct file *filp, void *priv,
 	return ret;
 }
 
-
-
-static int mcam_vidioc_queryctrl(struct file *filp, void *priv,
-		struct v4l2_queryctrl *qc)
-{
-	struct mcam_camera *cam = priv;
-	int ret;
-
-	mutex_lock(&cam->s_mutex);
-	ret = sensor_call(cam, core, queryctrl, qc);
-	mutex_unlock(&cam->s_mutex);
-	return ret;
-}
-
-
-static int mcam_vidioc_g_ctrl(struct file *filp, void *priv,
-		struct v4l2_control *ctrl)
-{
-	struct mcam_camera *cam = priv;
-	int ret;
-
-	mutex_lock(&cam->s_mutex);
-	ret = sensor_call(cam, core, g_ctrl, ctrl);
-	mutex_unlock(&cam->s_mutex);
-	return ret;
-}
-
-
-static int mcam_vidioc_s_ctrl(struct file *filp, void *priv,
-		struct v4l2_control *ctrl)
-{
-	struct mcam_camera *cam = priv;
-	int ret;
-
-	mutex_lock(&cam->s_mutex);
-	ret = sensor_call(cam, core, s_ctrl, ctrl);
-	mutex_unlock(&cam->s_mutex);
-	return ret;
-}
-
-
 static int mcam_vidioc_querycap(struct file *file, void *priv,
 		struct v4l2_capability *cap)
 {
@@ -1404,8 +1339,14 @@ static int mcam_vidioc_s_input(struct file *filp, void *priv, unsigned int i)
 }
 
 /* from vivi.c */
-static int mcam_vidioc_s_std(struct file *filp, void *priv, v4l2_std_id *a)
+static int mcam_vidioc_s_std(struct file *filp, void *priv, v4l2_std_id a)
 {
+	return 0;
+}
+
+static int mcam_vidioc_g_std(struct file *filp, void *priv, v4l2_std_id *a)
+{
+	*a = V4L2_STD_NTSC_M;
 	return 0;
 }
 
@@ -1439,20 +1380,6 @@ static int mcam_vidioc_s_parm(struct file *filp, void *priv,
 	return ret;
 }
 
-static int mcam_vidioc_g_chip_ident(struct file *file, void *priv,
-		struct v4l2_dbg_chip_ident *chip)
-{
-	struct mcam_camera *cam = priv;
-
-	chip->ident = V4L2_IDENT_NONE;
-	chip->revision = 0;
-	if (v4l2_chip_match_host(&chip->match)) {
-		chip->ident = cam->chip_id;
-		return 0;
-	}
-	return sensor_call(cam, core, g_chip_ident, chip);
-}
-
 static int mcam_vidioc_enum_framesizes(struct file *filp, void *priv,
 		struct v4l2_frmsizeenum *sizes)
 {
@@ -1483,24 +1410,22 @@ static int mcam_vidioc_g_register(struct file *file, void *priv,
 {
 	struct mcam_camera *cam = priv;
 
-	if (v4l2_chip_match_host(&reg->match)) {
-		reg->val = mcam_reg_read(cam, reg->reg);
-		reg->size = 4;
-		return 0;
-	}
-	return sensor_call(cam, core, g_register, reg);
+	if (reg->reg > cam->regs_size - 4)
+		return -EINVAL;
+	reg->val = mcam_reg_read(cam, reg->reg);
+	reg->size = 4;
+	return 0;
 }
 
 static int mcam_vidioc_s_register(struct file *file, void *priv,
-		struct v4l2_dbg_register *reg)
+		const struct v4l2_dbg_register *reg)
 {
 	struct mcam_camera *cam = priv;
 
-	if (v4l2_chip_match_host(&reg->match)) {
-		mcam_reg_write(cam, reg->reg, reg->val);
-		return 0;
-	}
-	return sensor_call(cam, core, s_register, reg);
+	if (reg->reg > cam->regs_size - 4)
+		return -EINVAL;
+	mcam_reg_write(cam, reg->reg, reg->val);
+	return 0;
 }
 #endif
 
@@ -1514,20 +1439,17 @@ static const struct v4l2_ioctl_ops mcam_v4l_ioctl_ops = {
 	.vidioc_g_input		= mcam_vidioc_g_input,
 	.vidioc_s_input		= mcam_vidioc_s_input,
 	.vidioc_s_std		= mcam_vidioc_s_std,
+	.vidioc_g_std		= mcam_vidioc_g_std,
 	.vidioc_reqbufs		= mcam_vidioc_reqbufs,
 	.vidioc_querybuf	= mcam_vidioc_querybuf,
 	.vidioc_qbuf		= mcam_vidioc_qbuf,
 	.vidioc_dqbuf		= mcam_vidioc_dqbuf,
 	.vidioc_streamon	= mcam_vidioc_streamon,
 	.vidioc_streamoff	= mcam_vidioc_streamoff,
-	.vidioc_queryctrl	= mcam_vidioc_queryctrl,
-	.vidioc_g_ctrl		= mcam_vidioc_g_ctrl,
-	.vidioc_s_ctrl		= mcam_vidioc_s_ctrl,
 	.vidioc_g_parm		= mcam_vidioc_g_parm,
 	.vidioc_s_parm		= mcam_vidioc_s_parm,
 	.vidioc_enum_framesizes = mcam_vidioc_enum_framesizes,
 	.vidioc_enum_frameintervals = mcam_vidioc_enum_frameintervals,
-	.vidioc_g_chip_ident	= mcam_vidioc_g_chip_ident,
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 	.vidioc_g_register	= mcam_vidioc_g_register,
 	.vidioc_s_register	= mcam_vidioc_s_register,
@@ -1545,7 +1467,9 @@ static int mcam_v4l_open(struct file *filp)
 
 	filp->private_data = cam;
 
-	frames = singles = delivered = 0;
+	cam->frame_state.frames = 0;
+	cam->frame_state.singles = 0;
+	cam->frame_state.delivered = 0;
 	mutex_lock(&cam->s_mutex);
 	if (cam->users == 0) {
 		ret = mcam_setup_vb2(cam);
@@ -1566,8 +1490,9 @@ static int mcam_v4l_release(struct file *filp)
 {
 	struct mcam_camera *cam = filp->private_data;
 
-	cam_dbg(cam, "Release, %d frames, %d singles, %d delivered\n", frames,
-			singles, delivered);
+	cam_dbg(cam, "Release, %d frames, %d singles, %d delivered\n",
+			cam->frame_state.frames, cam->frame_state.singles,
+			cam->frame_state.delivered);
 	mutex_lock(&cam->s_mutex);
 	(cam->users)--;
 	if (cam->users == 0) {
@@ -1640,7 +1565,6 @@ static const struct v4l2_file_operations mcam_v4l_fops = {
 static struct video_device mcam_v4l_template = {
 	.name = "mcam",
 	.tvnorms = V4L2_STD_NTSC_M,
-	.current_norm = V4L2_STD_NTSC_M,  /* make mplayer happy */
 
 	.fops = &mcam_v4l_fops,
 	.ioctl_ops = &mcam_v4l_ioctl_ops,
@@ -1660,7 +1584,7 @@ static void mcam_frame_complete(struct mcam_camera *cam, int frame)
 	clear_bit(CF_DMA_ACTIVE, &cam->flags);
 	cam->next_buf = frame;
 	cam->buf_seq[frame] = ++(cam->sequence);
-	frames++;
+	cam->frame_state.frames++;
 	/*
 	 * "This should never happen"
 	 */
@@ -1742,7 +1666,7 @@ int mccic_register(struct mcam_camera *cam)
 	if (buffer_mode >= 0)
 		cam->buffer_mode = buffer_mode;
 	if (cam->buffer_mode == B_DMA_sg &&
-			cam->chip_id == V4L2_IDENT_CAFE) {
+			cam->chip_id == MCAM_CAFE) {
 		printk(KERN_ERR "marvell-cam: Cafe can't do S/G I/O, "
 			"attempting vmalloc mode instead\n");
 		cam->buffer_mode = B_vmalloc;
@@ -1786,14 +1710,19 @@ int mccic_register(struct mcam_camera *cam)
 	/*
 	 * Get the v4l2 setup done.
 	 */
+	ret = v4l2_ctrl_handler_init(&cam->ctrl_handler, 10);
+	if (ret)
+		goto out_unregister;
+	cam->v4l2_dev.ctrl_handler = &cam->ctrl_handler;
+
 	mutex_lock(&cam->s_mutex);
 	cam->vdev = mcam_v4l_template;
 	cam->vdev.debug = 0;
 	cam->vdev.v4l2_dev = &cam->v4l2_dev;
+	video_set_drvdata(&cam->vdev, cam);
 	ret = video_register_device(&cam->vdev, VFL_TYPE_GRABBER, -1);
 	if (ret)
 		goto out;
-	video_set_drvdata(&cam->vdev, cam);
 
 	/*
 	 * If so requested, try to get our DMA buffers now.
@@ -1805,6 +1734,7 @@ int mccic_register(struct mcam_camera *cam)
 	}
 
 out:
+	v4l2_ctrl_handler_free(&cam->ctrl_handler);
 	mutex_unlock(&cam->s_mutex);
 	return ret;
 out_unregister:
@@ -1829,6 +1759,7 @@ void mccic_shutdown(struct mcam_camera *cam)
 	if (cam->buffer_mode == B_vmalloc)
 		mcam_free_dma_bufs(cam);
 	video_unregister_device(&cam->vdev);
+	v4l2_ctrl_handler_free(&cam->ctrl_handler);
 	v4l2_device_unregister(&cam->v4l2_dev);
 }
 

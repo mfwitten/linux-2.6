@@ -239,9 +239,6 @@ static int spi_gpio_setup(struct spi_device *spi)
 	struct spi_gpio		*spi_gpio = spi_to_spi_gpio(spi);
 	struct device_node	*np = spi->master->dev.of_node;
 
-	if (spi->bits_per_word > 32)
-		return -EINVAL;
-
 	if (np) {
 		/*
 		 * In DT environments, the CS GPIOs have already been
@@ -265,9 +262,9 @@ static int spi_gpio_setup(struct spi_device *spi)
 		}
 	}
 	if (!status) {
-		status = spi_bitbang_setup(spi);
 		/* in case it was initialized from static board data */
 		spi_gpio->cs_gpios[spi->chip_select] = cs;
+		status = spi_bitbang_setup(spi);
 	}
 
 	if (status) {
@@ -287,7 +284,7 @@ static void spi_gpio_cleanup(struct spi_device *spi)
 	spi_bitbang_cleanup(spi);
 }
 
-static int __devinit spi_gpio_alloc(unsigned pin, const char *label, bool is_in)
+static int spi_gpio_alloc(unsigned pin, const char *label, bool is_in)
 {
 	int value;
 
@@ -301,9 +298,8 @@ static int __devinit spi_gpio_alloc(unsigned pin, const char *label, bool is_in)
 	return value;
 }
 
-static int __devinit
-spi_gpio_request(struct spi_gpio_platform_data *pdata, const char *label,
-	u16 *res_flags)
+static int spi_gpio_request(struct spi_gpio_platform_data *pdata,
+			    const char *label, u16 *res_flags)
 {
 	int value;
 
@@ -366,9 +362,26 @@ static int spi_gpio_probe_dt(struct platform_device *pdev)
 	if (!pdata)
 		return -ENOMEM;
 
-	pdata->sck = of_get_named_gpio(np, "gpio-sck", 0);
-	pdata->miso = of_get_named_gpio(np, "gpio-miso", 0);
-	pdata->mosi = of_get_named_gpio(np, "gpio-mosi", 0);
+	ret = of_get_named_gpio(np, "gpio-sck", 0);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "gpio-sck property not found\n");
+		goto error_free;
+	}
+	pdata->sck = ret;
+
+	ret = of_get_named_gpio(np, "gpio-miso", 0);
+	if (ret < 0) {
+		dev_info(&pdev->dev, "gpio-miso property not found, switching to no-rx mode\n");
+		pdata->miso = SPI_GPIO_NO_MISO;
+	} else
+		pdata->miso = ret;
+
+	ret = of_get_named_gpio(np, "gpio-mosi", 0);
+	if (ret < 0) {
+		dev_info(&pdev->dev, "gpio-mosi property not found, switching to no-tx mode\n");
+		pdata->mosi = SPI_GPIO_NO_MOSI;
+	} else
+		pdata->mosi = ret;
 
 	ret = of_property_read_u32(np, "num-chipselects", &tmp);
 	if (ret < 0) {
@@ -392,7 +405,7 @@ static inline int spi_gpio_probe_dt(struct platform_device *pdev)
 }
 #endif
 
-static int __devinit spi_gpio_probe(struct platform_device *pdev)
+static int spi_gpio_probe(struct platform_device *pdev)
 {
 	int				status;
 	struct spi_master		*master;
@@ -430,6 +443,7 @@ static int __devinit spi_gpio_probe(struct platform_device *pdev)
 	if (pdata)
 		spi_gpio->pdata = *pdata;
 
+	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(1, 32);
 	master->flags = master_flags;
 	master->bus_num = pdev->id;
 	master->num_chipselect = SPI_N_CHIPSEL;
@@ -485,7 +499,7 @@ gpio_free:
 	return status;
 }
 
-static int __devexit spi_gpio_remove(struct platform_device *pdev)
+static int spi_gpio_remove(struct platform_device *pdev)
 {
 	struct spi_gpio			*spi_gpio;
 	struct spi_gpio_platform_data	*pdata;
@@ -497,8 +511,6 @@ static int __devexit spi_gpio_remove(struct platform_device *pdev)
 	/* stop() unregisters child devices too */
 	status = spi_bitbang_stop(&spi_gpio->bitbang);
 	spi_master_put(spi_gpio->bitbang.master);
-
-	platform_set_drvdata(pdev, NULL);
 
 	if (SPI_MISO_GPIO != SPI_GPIO_NO_MISO)
 		gpio_free(SPI_MISO_GPIO);
@@ -518,7 +530,7 @@ static struct platform_driver spi_gpio_driver = {
 		.of_match_table = of_match_ptr(spi_gpio_dt_ids),
 	},
 	.probe		= spi_gpio_probe,
-	.remove		= __devexit_p(spi_gpio_remove),
+	.remove		= spi_gpio_remove,
 };
 module_platform_driver(spi_gpio_driver);
 

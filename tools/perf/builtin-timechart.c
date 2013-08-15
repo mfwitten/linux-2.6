@@ -965,7 +965,7 @@ static void write_svg_file(const char *filename)
 	svg_close();
 }
 
-static int __cmd_timechart(const char *input_name, const char *output_name)
+static int __cmd_timechart(const char *output_name)
 {
 	struct perf_tool perf_timechart = {
 		.comm		 = process_comm_event,
@@ -1005,7 +1005,7 @@ static int __cmd_record(int argc, const char **argv)
 {
 #ifdef SUPPORT_OLD_POWER_EVENTS
 	const char * const record_old_args[] = {
-		"record", "-a", "-R", "-f", "-c", "1",
+		"record", "-a", "-R", "-c", "1",
 		"-e", "power:power_start",
 		"-e", "power:power_end",
 		"-e", "power:power_frequency",
@@ -1014,7 +1014,7 @@ static int __cmd_record(int argc, const char **argv)
 	};
 #endif
 	const char * const record_new_args[] = {
-		"record", "-a", "-R", "-f", "-c", "1",
+		"record", "-a", "-R", "-c", "1",
 		"-e", "power:cpu_frequency",
 		"-e", "power:cpu_idle",
 		"-e", "sched:sched_wakeup",
@@ -1061,7 +1061,6 @@ parse_process(const struct option *opt __maybe_unused, const char *arg,
 int cmd_timechart(int argc, const char **argv,
 		  const char *prefix __maybe_unused)
 {
-	const char *input_name;
 	const char *output_name = "output.svg";
 	const struct option options[] = {
 	OPT_STRING('i', "input", &input_name, "file", "input file name"),
@@ -1092,5 +1091,5 @@ int cmd_timechart(int argc, const char **argv,
 
 	setup_pager();
 
-	return __cmd_timechart(input_name, output_name);
+	return __cmd_timechart(output_name);
 }

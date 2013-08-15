@@ -189,7 +189,7 @@ static int xgmac_mdio_reset(struct mii_bus *bus)
 	return ret;
 }
 
-static int __devinit xgmac_mdio_probe(struct platform_device *pdev)
+static int xgmac_mdio_probe(struct platform_device *pdev)
 {
 	struct device_node *np = pdev->dev.of_node;
 	struct mii_bus *bus;
@@ -227,7 +227,7 @@ static int __devinit xgmac_mdio_probe(struct platform_device *pdev)
 		goto err_registration;
 	}
 
-	dev_set_drvdata(&pdev->dev, bus);
+	platform_set_drvdata(pdev, bus);
 
 	return 0;
 
@@ -240,9 +240,9 @@ err_ioremap:
 	return ret;
 }
 
-static int __devexit xgmac_mdio_remove(struct platform_device *pdev)
+static int xgmac_mdio_remove(struct platform_device *pdev)
 {
-	struct mii_bus *bus = dev_get_drvdata(&pdev->dev);
+	struct mii_bus *bus = platform_get_drvdata(pdev);
 
 	mdiobus_unregister(bus);
 	iounmap(bus->priv);

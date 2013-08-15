@@ -21,15 +21,13 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/idr.h>
+#include <linux/acpi.h>
 
 #include "base.h"
 #include "power/power.h"
 
 /* For automatically allocated device IDs */
 static DEFINE_IDA(platform_devid_ida);
-
-#define to_platform_driver(drv)	(container_of((drv), struct platform_driver, \
-				 driver))
 
 struct device platform_bus = {
 	.init_name	= "platform",
@@ -44,9 +42,9 @@ EXPORT_SYMBOL_GPL(platform_bus);
  * be setup before the platform_notifier is called.  So if a user needs to
  * manipulate any relevant information in the pdev_archdata they can do:
  *
- * 	platform_devic_alloc()
- * 	... manipulate ...
- * 	platform_device_add()
+ *	platform_device_alloc()
+ *	... manipulate ...
+ *	platform_device_add()
  *
  * And if they don't care they can just call platform_device_register() and
  * everything will just work out.
@@ -83,9 +81,16 @@ EXPORT_SYMBOL_GPL(platform_get_resource);
  */
 int platform_get_irq(struct platform_device *dev, unsigned int num)
 {
+#ifdef CONFIG_SPARC
+	/* sparc does not have irqs represented as IORESOURCE_IRQ resources */
+	if (!dev || num >= dev->archdata.num_irqs)
+		return -ENXIO;
+	return dev->archdata.irqs[num];
+#else
 	struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
 
 	return r ? r->start : -ENXIO;
+#endif
 }
 EXPORT_SYMBOL_GPL(platform_get_irq);
 
@@ -115,7 +120,7 @@ struct resource *platform_get_resource_byname(struct platform_device *dev,
 EXPORT_SYMBOL_GPL(platform_get_resource_byname);
 
 /**
- * platform_get_irq - get an IRQ for a device
+ * platform_get_irq_byname - get an IRQ for a device by name
  * @dev: platform device
  * @name: IRQ name
  */
@@ -318,9 +323,7 @@ int platform_device_add(struct platform_device *pdev)
 		}
 
 		if (p && insert_resource(p, r)) {
-			printk(KERN_ERR
-			       "%s: failed to claim resource %d\n",
-			       dev_name(&pdev->dev), i);
+			dev_err(&pdev->dev, "failed to claim resource %d\n", i);
 			ret = -EBUSY;
 			goto failed;
 		}
@@ -429,6 +432,7 @@ struct platform_device *platform_device_register_full(
 		goto err_alloc;
 
 	pdev->dev.parent = pdevinfo->parent;
+	ACPI_HANDLE_SET(&pdev->dev, pdevinfo->acpi_node.handle);
 
 	if (pdevinfo->dma_mask) {
 		/*
@@ -459,6 +463,7 @@ struct platform_device *platform_device_register_full(
 	ret = platform_device_add(pdev);
 	if (ret) {
 err:
+		ACPI_HANDLE_SET(&pdev->dev, NULL);
 		kfree(pdev->dev.dma_mask);
 
 err_alloc:
@@ -474,8 +479,16 @@ static int platform_drv_probe(struct device *_dev)
 {
 	struct platform_driver *drv = to_platform_driver(_dev->driver);
 	struct platform_device *dev = to_platform_device(_dev);
+	int ret;
 
-	return drv->probe(dev);
+	if (ACPI_HANDLE(_dev))
+		acpi_dev_pm_attach(_dev, true);
+
+	ret = drv->probe(dev);
+	if (ret && ACPI_HANDLE(_dev))
+		acpi_dev_pm_detach(_dev, true);
+
+	return ret;
 }
 
 static int platform_drv_probe_fail(struct device *_dev)
@@ -487,8 +500,13 @@ static int platform_drv_remove(struct device *_dev)
 {
 	struct platform_driver *drv = to_platform_driver(_dev->driver);
 	struct platform_device *dev = to_platform_device(_dev);
+	int ret;
 
-	return drv->remove(dev);
+	ret = drv->remove(dev);
+	if (ACPI_HANDLE(_dev))
+		acpi_dev_pm_detach(_dev, true);
+
+	return ret;
 }
 
 static void platform_drv_shutdown(struct device *_dev)
@@ -497,14 +515,19 @@ static void platform_drv_shutdown(struct device *_dev)
 	struct platform_device *dev = to_platform_device(_dev);
 
 	drv->shutdown(dev);
+	if (ACPI_HANDLE(_dev))
+		acpi_dev_pm_detach(_dev, true);
 }
 
 /**
- * platform_driver_register - register a driver for platform-level devices
+ * __platform_driver_register - register a driver for platform-level devices
  * @drv: platform driver structure
+ * @owner: owning module/driver
  */
-int platform_driver_register(struct platform_driver *drv)
+int __platform_driver_register(struct platform_driver *drv,
+				struct module *owner)
 {
+	drv->driver.owner = owner;
 	drv->driver.bus = &platform_bus_type;
 	if (drv->probe)
 		drv->driver.probe = platform_drv_probe;
@@ -515,7 +538,7 @@ int platform_driver_register(struct platform_driver *drv)
 
 	return driver_register(&drv->driver);
 }
-EXPORT_SYMBOL_GPL(platform_driver_register);
+EXPORT_SYMBOL_GPL(__platform_driver_register);
 
 /**
  * platform_driver_unregister - unregister a driver for platform-level devices
@@ -530,7 +553,8 @@ EXPORT_SYMBOL_GPL(platform_driver_unregister);
 /**
  * platform_driver_probe - register driver for non-hotpluggable device
  * @drv: platform driver structure
- * @probe: the driver probe routine, probably from an __init section
+ * @probe: the driver probe routine, probably from an __init section,
+ *         must not return -EPROBE_DEFER.
  *
  * Use this instead of platform_driver_register() when you know the device
  * is not hotpluggable and has already been registered, and you want to
@@ -540,6 +564,9 @@ EXPORT_SYMBOL_GPL(platform_driver_unregister);
  * One typical use for this would be with drivers for controllers integrated
  * into system-on-chip processors, where the controller devices have been
  * configured as part of board setup.
+ *
+ * This is incompatible with deferred probing so probe() must not
+ * return -EPROBE_DEFER.
  *
  * Returns zero if the driver registered and bound to a device, else returns
  * a negative error code and with the driver not registered.
@@ -657,7 +684,7 @@ static int platform_uevent(struct device *dev, struct kobj_uevent_env *env)
 	int rc;
 
 	/* Some devices have extra OF data and an OF-style MODALIAS */
-	rc = of_device_uevent_modalias(dev,env);
+	rc = of_device_uevent_modalias(dev, env);
 	if (rc != -ENODEV)
 		return rc;
 
@@ -700,6 +727,10 @@ static int platform_match(struct device *dev, struct device_driver *drv)
 
 	/* Attempt an OF style match first */
 	if (of_driver_match_device(dev, drv))
+		return 1;
+
+	/* Then try ACPI style match */
+	if (acpi_driver_match_device(dev, drv))
 		return 1;
 
 	/* Then try to match against the id table */
@@ -857,7 +888,6 @@ int platform_pm_restore(struct device *dev)
 static const struct dev_pm_ops platform_dev_pm_ops = {
 	.runtime_suspend = pm_generic_runtime_suspend,
 	.runtime_resume = pm_generic_runtime_resume,
-	.runtime_idle = pm_generic_runtime_idle,
 	USE_PLATFORM_PM_SLEEP_OPS
 };
 
@@ -1097,8 +1127,8 @@ static int __init early_platform_driver_probe_id(char *class_str,
 
 		switch (match_id) {
 		case EARLY_PLATFORM_ID_ERROR:
-			pr_warning("%s: unable to parse %s parameter\n",
-				   class_str, epdrv->pdrv->driver.name);
+			pr_warn("%s: unable to parse %s parameter\n",
+				class_str, epdrv->pdrv->driver.name);
 			/* fall-through */
 		case EARLY_PLATFORM_ID_UNSET:
 			match = NULL;
@@ -1129,8 +1159,8 @@ static int __init early_platform_driver_probe_id(char *class_str,
 			}
 
 			if (epdrv->pdrv->probe(match))
-				pr_warning("%s: unable to probe %s early.\n",
-					   class_str, match->name);
+				pr_warn("%s: unable to probe %s early.\n",
+					class_str, match->name);
 			else
 				n++;
 		}

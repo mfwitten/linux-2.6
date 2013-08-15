@@ -45,10 +45,9 @@ int machine_kexec_prepare(struct kimage *image)
 	for (i = 0; i < image->nr_segments; i++) {
 		current_segment = &image->segment[i];
 
-		err = memblock_is_region_memory(current_segment->mem,
-						current_segment->memsz);
-		if (err)
-			return - EINVAL;
+		if (!memblock_is_region_memory(current_segment->mem,
+					       current_segment->memsz))
+			return -EINVAL;
 
 		err = get_user(header, (__be32*)current_segment->buf);
 		if (err)
@@ -135,6 +134,10 @@ void machine_kexec(struct kimage *image)
 	unsigned long reboot_code_buffer_phys;
 	void *reboot_code_buffer;
 
+	if (num_online_cpus() > 1) {
+		pr_err("kexec: error: multiple CPUs still online\n");
+		return;
+	}
 
 	page_list = image->head & PAGE_MASK;
 

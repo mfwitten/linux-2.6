@@ -90,7 +90,6 @@ static int ehci_msp_setup(struct usb_hcd *hcd)
 		return retval;
 
 	usb_hcd_tdi_set_mode(ehci);
-	ehci_port_power(ehci, 0);
 
 	return retval;
 }
@@ -292,8 +291,7 @@ static const struct hc_driver ehci_msp_hc_driver = {
 	/*
 	 * basic lifecycle operations
 	 */
-	.reset =		ehci_msp_setup,
-	.start =		ehci_run,
+	.reset			= ehci_msp_setup,
 	.shutdown		= ehci_shutdown,
 	.start			= ehci_run,
 	.stop			= ehci_stop,

@@ -335,8 +335,6 @@ alloc_failed:
 	return NULL;
 }
 
-static const char *input_name;
-
 struct trace_lock_handler {
 	int (*acquire_event)(struct perf_evsel *evsel,
 			     struct perf_sample *sample);
@@ -880,7 +878,7 @@ static int __cmd_report(void)
 static int __cmd_record(int argc, const char **argv)
 {
 	const char *record_args[] = {
-		"record", "-R", "-f", "-m", "1024", "-c", "1",
+		"record", "-R", "-m", "1024", "-c", "1",
 	};
 	unsigned int rec_argc, i, j;
 	const char **rec_argv;

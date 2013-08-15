@@ -7,15 +7,12 @@
 #include <linux/platform_device.h>
 #include <linux/init.h>
 #include <linux/gpio.h>
+#include <linux/platform_data/pinctrl-nomadik.h>
+#include <linux/platform_data/dma-ste-dma40.h>
 
-#include <plat/gpio-nomadik.h>
-#include <plat/pincfg.h>
-#include <plat/ste_dma40.h>
-
-#include <mach/devices.h>
-#include <mach/hardware.h>
-#include <mach/irqs.h>
-#include <mach/msp.h>
+#include "devices.h"
+#include "irqs.h"
+#include <linux/platform_data/asoc-ux500-msp.h>
 
 #include "ste-dma40-db8500.h"
 #include "board-mop500.h"
@@ -24,28 +21,14 @@
 
 static struct stedma40_chan_cfg msp0_dma_rx = {
 	.high_priority = true,
-	.dir = STEDMA40_PERIPH_TO_MEM,
-
-	.src_dev_type = DB8500_DMA_DEV31_MSP0_RX_SLIM0_CH0_RX,
-	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-
-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-
-	/* data_width is set during configuration */
+	.dir = DMA_DEV_TO_MEM,
+	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
 };
 
 static struct stedma40_chan_cfg msp0_dma_tx = {
 	.high_priority = true,
-	.dir = STEDMA40_MEM_TO_PERIPH,
-
-	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
-	.dst_dev_type = DB8500_DMA_DEV31_MSP0_TX_SLIM0_CH0_TX,
-
-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-
-	/* data_width is set during configuration */
+	.dir = DMA_MEM_TO_DEV,
+	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
 };
 
 struct msp_i2s_platform_data msp0_platform_data = {
@@ -56,28 +39,14 @@ struct msp_i2s_platform_data msp0_platform_data = {
 
 static struct stedma40_chan_cfg msp1_dma_rx = {
 	.high_priority = true,
-	.dir = STEDMA40_PERIPH_TO_MEM,
-
-	.src_dev_type = DB8500_DMA_DEV30_MSP3_RX,
-	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-
-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-
-	/* data_width is set during configuration */
+	.dir = DMA_DEV_TO_MEM,
+	.dev_type = DB8500_DMA_DEV30_MSP3,
 };
 
 static struct stedma40_chan_cfg msp1_dma_tx = {
 	.high_priority = true,
-	.dir = STEDMA40_MEM_TO_PERIPH,
-
-	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
-	.dst_dev_type = DB8500_DMA_DEV30_MSP1_TX,
-
-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-
-	/* data_width is set during configuration */
+	.dir = DMA_MEM_TO_DEV,
+	.dev_type = DB8500_DMA_DEV30_MSP1,
 };
 
 struct msp_i2s_platform_data msp1_platform_data = {
@@ -88,32 +57,16 @@ struct msp_i2s_platform_data msp1_platform_data = {
 
 static struct stedma40_chan_cfg msp2_dma_rx = {
 	.high_priority = true,
-	.dir = STEDMA40_PERIPH_TO_MEM,
-
-	.src_dev_type = DB8500_DMA_DEV14_MSP2_RX,
-	.dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-
-	/* MSP2 DMA doesn't work with PSIZE == 4 on DB8500v2 */
-	.src_info.psize = STEDMA40_PSIZE_LOG_1,
-	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
-
-	/* data_width is set during configuration */
+	.dir = DMA_DEV_TO_MEM,
+	.dev_type = DB8500_DMA_DEV14_MSP2,
 };
 
 static struct stedma40_chan_cfg msp2_dma_tx = {
 	.high_priority = true,
-	.dir = STEDMA40_MEM_TO_PERIPH,
-
-	.src_dev_type = STEDMA40_DEV_DST_MEMORY,
-	.dst_dev_type = DB8500_DMA_DEV14_MSP2_TX,
-
-	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-
+	.dir = DMA_MEM_TO_DEV,
+	.dev_type = DB8500_DMA_DEV14_MSP2,
 	.use_fixed_channel = true,
 	.phy_channel = 1,
-
-	/* data_width is set during configuration */
 };
 
 static struct platform_device *db8500_add_msp_i2s(struct device *parent,
@@ -150,15 +103,6 @@ static struct platform_device snd_soc_mop500 = {
 	},
 };
 
-/* Platform device for Ux500-PCM */
-static struct platform_device ux500_pcm = {
-		.name = "ux500-pcm",
-		.id = 0,
-		.dev = {
-			.platform_data = NULL,
-		},
-};
-
 struct msp_i2s_platform_data msp2_platform_data = {
 	.id = MSP_I2S_2,
 	.msp_i2s_dma_rx = &msp2_dma_rx,
@@ -185,11 +129,4 @@ void mop500_audio_init(struct device *parent)
 			   &msp2_platform_data);
 	db8500_add_msp_i2s(parent, 3, U8500_MSP3_BASE, IRQ_DB8500_MSP1,
 			   &msp3_platform_data);
-}
-
-/* Due for removal once the MSP driver has been fully DT:ed. */
-void mop500_of_audio_init(struct device *parent)
-{
-	pr_info("%s: Register platform-device 'ux500-pcm'\n", __func__);
-	platform_device_register(&ux500_pcm);
 }

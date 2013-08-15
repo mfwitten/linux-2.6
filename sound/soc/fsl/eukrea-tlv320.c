@@ -80,7 +80,7 @@ static struct snd_soc_dai_link eukrea_tlv320_dai = {
 	.name		= "tlv320aic23",
 	.stream_name	= "TLV320AIC23",
 	.codec_dai_name	= "tlv320aic23-hifi",
-	.platform_name	= "imx-fiq-pcm-audio.0",
+	.platform_name	= "imx-ssi.0",
 	.codec_name	= "tlv320aic23-codec.0-001a",
 	.cpu_dai_name	= "imx-ssi.0",
 	.ops		= &eukrea_tlv320_snd_ops,
@@ -93,7 +93,7 @@ static struct snd_soc_card eukrea_tlv320 = {
 	.num_links	= 1,
 };
 
-static int __devinit eukrea_tlv320_probe(struct platform_device *pdev)
+static int eukrea_tlv320_probe(struct platform_device *pdev)
 {
 	int ret;
 	int int_port = 0, ext_port;
@@ -142,7 +142,7 @@ static int __devinit eukrea_tlv320_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int __devexit eukrea_tlv320_remove(struct platform_device *pdev)
+static int eukrea_tlv320_remove(struct platform_device *pdev)
 {
 	snd_soc_unregister_card(&eukrea_tlv320);
 
@@ -155,7 +155,7 @@ static struct platform_driver eukrea_tlv320_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = eukrea_tlv320_probe,
-	.remove = __devexit_p(eukrea_tlv320_remove),};
+	.remove = eukrea_tlv320_remove,};
 
 module_platform_driver(eukrea_tlv320_driver);
 

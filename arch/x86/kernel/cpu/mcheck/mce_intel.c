@@ -24,6 +24,18 @@
  * Also supports reliable discovery of shared banks.
  */
 
+/*
+ * CMCI can be delivered to multiple cpus that share a machine check bank
+ * so we need to designate a single cpu to process errors logged in each bank
+ * in the interrupt handler (otherwise we would have many races and potential
+ * double reporting of the same error).
+ * Note that this can change when a cpu is offlined or brought online since
+ * some MCA banks are shared across cpus. When a cpu is offlined, cmci_clear()
+ * disables CMCI on all banks owned by the cpu and clears this bitfield. At
+ * this point, cmci_rediscover() kicks in and a different cpu may end up
+ * taking ownership of some of the shared MCA banks that were previously
+ * owned by the offlined cpu.
+ */
 static DEFINE_PER_CPU(mce_banks_t, mce_banks_owned);
 
 /*
@@ -53,7 +65,7 @@ static int cmci_supported(int *banks)
 {
 	u64 cap;
 
-	if (mce_cmci_disabled || mce_ignore_ce)
+	if (mca_cfg.cmci_disabled || mca_cfg.ignore_ce)
 		return 0;
 
 	/*
@@ -200,7 +212,7 @@ static void cmci_discover(int banks)
 			continue;
 		}
 
-		if (!mce_bios_cmci_threshold) {
+		if (!mca_cfg.bios_cmci_threshold) {
 			val &= ~MCI_CTL2_CMCI_THRESHOLD_MASK;
 			val |= CMCI_THRESHOLD;
 		} else if (!(val & MCI_CTL2_CMCI_THRESHOLD_MASK)) {
@@ -227,7 +239,7 @@ static void cmci_discover(int banks)
 			 * set the thresholds properly or does not work with
 			 * this boot option. Note down now and report later.
 			 */
-			if (mce_bios_cmci_threshold && bios_zero_thresh &&
+			if (mca_cfg.bios_cmci_threshold && bios_zero_thresh &&
 					(val & MCI_CTL2_CMCI_THRESHOLD_MASK))
 				bios_wrong_thresh = 1;
 		} else {
@@ -235,7 +247,7 @@ static void cmci_discover(int banks)
 		}
 	}
 	raw_spin_unlock_irqrestore(&cmci_discover_lock, flags);
-	if (mce_bios_cmci_threshold && bios_wrong_thresh) {
+	if (mca_cfg.bios_cmci_threshold && bios_wrong_thresh) {
 		pr_info_once(
 			"bios_cmci_threshold: Some banks do not have valid thresholds set\n");
 		pr_info_once(
@@ -285,34 +297,24 @@ void cmci_clear(void)
 	raw_spin_unlock_irqrestore(&cmci_discover_lock, flags);
 }
 
-/*
- * After a CPU went down cycle through all the others and rediscover
- * Must run in process context.
- */
-void cmci_rediscover(int dying)
+static void cmci_rediscover_work_func(void *arg)
 {
 	int banks;
-	int cpu;
-	cpumask_var_t old;
+
+	/* Recheck banks in case CPUs don't all have the same */
+	if (cmci_supported(&banks))
+		cmci_discover(banks);
+}
+
+/* After a CPU went down cycle through all the others and rediscover */
+void cmci_rediscover(void)
+{
+	int banks;
 
 	if (!cmci_supported(&banks))
 		return;
-	if (!alloc_cpumask_var(&old, GFP_KERNEL))
-		return;
-	cpumask_copy(old, &current->cpus_allowed);
 
-	for_each_online_cpu(cpu) {
-		if (cpu == dying)
-			continue;
-		if (set_cpus_allowed_ptr(current, cpumask_of(cpu)))
-			continue;
-		/* Recheck banks in case CPUs don't all have the same */
-		if (cmci_supported(&banks))
-			cmci_discover(banks);
-	}
-
-	set_cpus_allowed_ptr(current, old);
-	free_cpumask_var(old);
+	on_each_cpu(cmci_rediscover_work_func, NULL, 1);
 }
 
 /*

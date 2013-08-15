@@ -25,7 +25,6 @@
 #include <asm/mach-types.h>
 
 #include <mach/mux.h>
-#include <plat/fpga.h>
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
@@ -93,14 +92,14 @@ static int omap_ohci_transceiver_power(int on)
 {
 	if (on) {
 		if (machine_is_omap_innovator() && cpu_is_omap1510())
-			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL)
+			__raw_writeb(__raw_readb(INNOVATOR_FPGA_CAM_USB_CONTROL)
 				| ((1 << 5/*usb1*/) | (1 << 3/*usb2*/)),
 			       INNOVATOR_FPGA_CAM_USB_CONTROL);
 		else if (machine_is_omap_osk())
 			tps65010_set_gpio_out_value(GPIO1, LOW);
 	} else {
 		if (machine_is_omap_innovator() && cpu_is_omap1510())
-			fpga_write(fpga_read(INNOVATOR_FPGA_CAM_USB_CONTROL)
+			__raw_writeb(__raw_readb(INNOVATOR_FPGA_CAM_USB_CONTROL)
 				& ~((1 << 5/*usb1*/) | (1 << 3/*usb2*/)),
 			       INNOVATOR_FPGA_CAM_USB_CONTROL);
 		else if (machine_is_omap_osk())
@@ -499,7 +498,6 @@ static int ohci_hcd_omap_drv_remove(struct platform_device *dev)
 	struct usb_hcd		*hcd = platform_get_drvdata(dev);
 
 	usb_hcd_omap_remove(hcd, dev);
-	platform_set_drvdata(dev, NULL);
 
 	return 0;
 }
@@ -530,7 +528,7 @@ static int ohci_omap_resume(struct platform_device *dev)
 	ohci->next_statechange = jiffies;
 
 	omap_ohci_clock_power(1);
-	ohci_finish_controller_resume(hcd);
+	ohci_resume(hcd, false);
 	return 0;
 }
 

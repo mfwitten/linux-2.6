@@ -26,6 +26,7 @@ config BCMA_HOST_PCI_POSSIBLE
 config BCMA_HOST_PCI
 	bool "Support for BCMA on PCI-host bus"
 	depends on BCMA_HOST_PCI_POSSIBLE
+	default y
 
 config BCMA_DRIVER_PCI_HOSTMODE
 	bool "Driver for PCI core working in hostmode"
@@ -62,6 +63,14 @@ config BCMA_DRIVER_GMAC_CMN
 	help
 	  Driver for the Broadcom GBIT MAC COMMON core attached to Broadcom
 	  specific Advanced Microcontroller Bus.
+
+	  If unsure, say N
+
+config BCMA_DRIVER_GPIO
+	bool "BCMA GPIO driver"
+	depends on BCMA && GPIOLIB
+	help
+	  Driver to provide access to the GPIO pins of the bcma bus.
 
 	  If unsure, say N
 

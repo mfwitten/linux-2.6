@@ -38,6 +38,9 @@
 
 #include <linux/pci.h>
 #include <linux/export.h>
+#ifdef CONFIG_X86
+#include <asm/mtrr.h>
+#endif
 
 /**
  * Get the bus id.
@@ -181,7 +184,17 @@ int drm_getmap(struct drm_device *dev, void *data,
 	map->type = r_list->map->type;
 	map->flags = r_list->map->flags;
 	map->handle = (void *)(unsigned long) r_list->user_token;
-	map->mtrr = r_list->map->mtrr;
+
+#ifdef CONFIG_X86
+	/*
+	 * There appears to be exactly one user of the mtrr index: dritest.
+	 * It's easy enough to keep it working on non-PAT systems.
+	 */
+	map->mtrr = phys_wc_to_mtrr_index(r_list->map->mtrr);
+#else
+	map->mtrr = -1;
+#endif
+
 	mutex_unlock(&dev->struct_mutex);
 
 	return 0;
@@ -286,6 +299,9 @@ int drm_getcap(struct drm_device *dev, void *data, struct drm_file *file_priv)
 	case DRM_CAP_PRIME:
 		req->value |= dev->driver->prime_fd_to_handle ? DRM_PRIME_CAP_IMPORT : 0;
 		req->value |= dev->driver->prime_handle_to_fd ? DRM_PRIME_CAP_EXPORT : 0;
+		break;
+	case DRM_CAP_TIMESTAMP_MONOTONIC:
+		req->value = drm_timestamp_monotonic;
 		break;
 	default:
 		return -EINVAL;

@@ -145,6 +145,10 @@ static int lines, cols;
 #include "../../../../lib/decompress_unlzo.c"
 #endif
 
+#ifdef CONFIG_KERNEL_LZ4
+#include "../../../../lib/decompress_unlz4.c"
+#endif
+
 static void scroll(void)
 {
 	int i;
@@ -324,6 +328,8 @@ asmlinkage void decompress_kernel(void *rmode, memptr heap,
 				  unsigned char *output)
 {
 	real_mode = rmode;
+
+	sanitize_boot_params(real_mode);
 
 	if (real_mode->screen_info.orig_video_mode == 7) {
 		vidmem = (char *) 0xb0000;

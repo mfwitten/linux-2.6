@@ -83,7 +83,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
-#include <asm/hardware/pl080.h>
+#include <linux/amba/pl080.h>
 
 #include "dmaengine.h"
 #include "virt-dma.h"
@@ -299,8 +299,8 @@ static int pl08x_request_mux(struct pl08x_dma_chan *plchan)
 	const struct pl08x_platform_data *pd = plchan->host->pd;
 	int ret;
 
-	if (plchan->mux_use++ == 0 && pd->get_signal) {
-		ret = pd->get_signal(plchan->cd);
+	if (plchan->mux_use++ == 0 && pd->get_xfer_signal) {
+		ret = pd->get_xfer_signal(plchan->cd);
 		if (ret < 0) {
 			plchan->mux_use = 0;
 			return ret;
@@ -318,8 +318,8 @@ static void pl08x_release_mux(struct pl08x_dma_chan *plchan)
 	if (plchan->signal >= 0) {
 		WARN_ON(plchan->mux_use == 0);
 
-		if (--plchan->mux_use == 0 && pd->put_signal) {
-			pd->put_signal(plchan->cd, plchan->signal);
+		if (--plchan->mux_use == 0 && pd->put_xfer_signal) {
+			pd->put_xfer_signal(plchan->cd, plchan->signal);
 			plchan->signal = -1;
 		}
 	}
@@ -1096,15 +1096,9 @@ static void pl08x_free_txd_list(struct pl08x_driver_data *pl08x,
 				struct pl08x_dma_chan *plchan)
 {
 	LIST_HEAD(head);
-	struct pl08x_txd *txd;
 
 	vchan_get_all_descriptors(&plchan->vc, &head);
-
-	while (!list_empty(&head)) {
-		txd = list_first_entry(&head, struct pl08x_txd, vd.node);
-		list_del(&txd->vd.node);
-		pl08x_desc_free(&txd->vd);
-	}
+	vchan_dma_desc_free_list(&plchan->vc, &head);
 }
 
 /*

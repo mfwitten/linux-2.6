@@ -12,7 +12,6 @@
  */
 
 #include <linux/bug.h>
-#include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
@@ -43,7 +42,7 @@ static int get_ramp_delay(int ramp_delay)
 {
 	unsigned char cnt = 0;
 
-	ramp_delay /= 6;
+	ramp_delay /= 6250;
 
 	while (true) {
 		ramp_delay = ramp_delay >> 1;
@@ -114,6 +113,7 @@ static struct regulator_ops s2mps11_buck_ops = {
 	.min_uV		= S2MPS11_BUCK_MIN1,			\
 	.uV_step	= S2MPS11_BUCK_STEP1,			\
 	.n_voltages	= S2MPS11_BUCK_N_VOLTAGES,		\
+	.ramp_delay	= S2MPS11_RAMP_DELAY,			\
 	.vsel_reg	= S2MPS11_REG_B1CTRL2 + (num - 1) * 2,	\
 	.vsel_mask	= S2MPS11_BUCK_VSEL_MASK,		\
 	.enable_reg	= S2MPS11_REG_B1CTRL1 + (num - 1) * 2,	\
@@ -129,6 +129,7 @@ static struct regulator_ops s2mps11_buck_ops = {
 	.min_uV		= S2MPS11_BUCK_MIN1,			\
 	.uV_step	= S2MPS11_BUCK_STEP1,			\
 	.n_voltages	= S2MPS11_BUCK_N_VOLTAGES,		\
+	.ramp_delay	= S2MPS11_RAMP_DELAY,			\
 	.vsel_reg	= S2MPS11_REG_B5CTRL2,			\
 	.vsel_mask	= S2MPS11_BUCK_VSEL_MASK,		\
 	.enable_reg	= S2MPS11_REG_B5CTRL1,			\
@@ -144,6 +145,7 @@ static struct regulator_ops s2mps11_buck_ops = {
 	.min_uV		= S2MPS11_BUCK_MIN1,			\
 	.uV_step	= S2MPS11_BUCK_STEP1,			\
 	.n_voltages	= S2MPS11_BUCK_N_VOLTAGES,		\
+	.ramp_delay	= S2MPS11_RAMP_DELAY,			\
 	.vsel_reg	= S2MPS11_REG_B6CTRL2 + (num - 6) * 2,	\
 	.vsel_mask	= S2MPS11_BUCK_VSEL_MASK,		\
 	.enable_reg	= S2MPS11_REG_B6CTRL1 + (num - 6) * 2,	\
@@ -159,6 +161,7 @@ static struct regulator_ops s2mps11_buck_ops = {
 	.min_uV		= S2MPS11_BUCK_MIN3,			\
 	.uV_step	= S2MPS11_BUCK_STEP3,			\
 	.n_voltages	= S2MPS11_BUCK_N_VOLTAGES,		\
+	.ramp_delay	= S2MPS11_RAMP_DELAY,			\
 	.vsel_reg	= S2MPS11_REG_B9CTRL2,			\
 	.vsel_mask	= S2MPS11_BUCK_VSEL_MASK,		\
 	.enable_reg	= S2MPS11_REG_B9CTRL1,			\
@@ -174,9 +177,10 @@ static struct regulator_ops s2mps11_buck_ops = {
 	.min_uV		= S2MPS11_BUCK_MIN2,			\
 	.uV_step	= S2MPS11_BUCK_STEP2,			\
 	.n_voltages	= S2MPS11_BUCK_N_VOLTAGES,		\
-	.vsel_reg	= S2MPS11_REG_B9CTRL2,			\
+	.ramp_delay	= S2MPS11_RAMP_DELAY,			\
+	.vsel_reg	= S2MPS11_REG_B10CTRL2,			\
 	.vsel_mask	= S2MPS11_BUCK_VSEL_MASK,		\
-	.enable_reg	= S2MPS11_REG_B9CTRL1,			\
+	.enable_reg	= S2MPS11_REG_B10CTRL1,			\
 	.enable_mask	= S2MPS11_ENABLE_MASK			\
 }
 
@@ -231,7 +235,7 @@ static struct regulator_desc regulators[] = {
 	regulator_desc_buck10,
 };
 
-static __devinit int s2mps11_pmic_probe(struct platform_device *pdev)
+static int s2mps11_pmic_probe(struct platform_device *pdev)
 {
 	struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
 	struct sec_platform_data *pdata = dev_get_platdata(iodev->dev);
@@ -269,16 +273,16 @@ static __devinit int s2mps11_pmic_probe(struct platform_device *pdev)
 
 	if (ramp_enable) {
 		if (s2mps11->buck2_ramp)
-			ramp_reg |= get_ramp_delay(s2mps11->ramp_delay2) >> 6;
+			ramp_reg |= get_ramp_delay(s2mps11->ramp_delay2) << 6;
 		if (s2mps11->buck3_ramp || s2mps11->buck4_ramp)
-			ramp_reg |= get_ramp_delay(s2mps11->ramp_delay34) >> 4;
+			ramp_reg |= get_ramp_delay(s2mps11->ramp_delay34) << 4;
 		sec_reg_write(iodev, S2MPS11_REG_RAMP, ramp_reg | ramp_enable);
 	}
 
 	ramp_reg &= 0x00;
-	ramp_reg |= get_ramp_delay(s2mps11->ramp_delay5) >> 6;
-	ramp_reg |= get_ramp_delay(s2mps11->ramp_delay16) >> 4;
-	ramp_reg |= get_ramp_delay(s2mps11->ramp_delay7810) >> 2;
+	ramp_reg |= get_ramp_delay(s2mps11->ramp_delay5) << 6;
+	ramp_reg |= get_ramp_delay(s2mps11->ramp_delay16) << 4;
+	ramp_reg |= get_ramp_delay(s2mps11->ramp_delay7810) << 2;
 	ramp_reg |= get_ramp_delay(s2mps11->ramp_delay9);
 	sec_reg_write(iodev, S2MPS11_REG_RAMP_BUCK, ramp_reg);
 
@@ -307,7 +311,7 @@ err:
 	return ret;
 }
 
-static int __devexit s2mps11_pmic_remove(struct platform_device *pdev)
+static int s2mps11_pmic_remove(struct platform_device *pdev)
 {
 	struct s2mps11_info *s2mps11 = platform_get_drvdata(pdev);
 	int i;
@@ -330,7 +334,7 @@ static struct platform_driver s2mps11_pmic_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = s2mps11_pmic_probe,
-	.remove = __devexit_p(s2mps11_pmic_remove),
+	.remove = s2mps11_pmic_remove,
 	.id_table = s2mps11_pmic_id,
 };
 

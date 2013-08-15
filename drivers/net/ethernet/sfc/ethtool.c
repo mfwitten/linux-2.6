@@ -154,6 +154,7 @@ static const struct efx_ethtool_stat efx_ethtool_stats[] = {
 	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_tcp_udp_chksum_err),
 	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_mcast_mismatch),
 	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_frm_trunc),
+	EFX_ETHTOOL_UINT_CHANNEL_STAT(rx_nodesc_trunc),
 };
 
 /* Number of ethtool statistics */
@@ -816,6 +817,9 @@ static int efx_ethtool_reset(struct net_device *net_dev, u32 *flags)
 /* MAC address mask including only MC flag */
 static const u8 mac_addr_mc_mask[ETH_ALEN] = { 0x01, 0, 0, 0, 0, 0 };
 
+#define IP4_ADDR_FULL_MASK	((__force __be32)~0)
+#define PORT_FULL_MASK		((__force __be16)~0)
+
 static int efx_ethtool_get_class_rule(struct efx_nic *efx,
 				      struct ethtool_rx_flow_spec *rule)
 {
@@ -865,12 +869,12 @@ static int efx_ethtool_get_class_rule(struct efx_nic *efx,
 			&spec, &proto, &ip_entry->ip4dst, &ip_entry->pdst,
 			&ip_entry->ip4src, &ip_entry->psrc);
 		EFX_WARN_ON_PARANOID(rc);
-		ip_mask->ip4src = ~0;
-		ip_mask->psrc = ~0;
+		ip_mask->ip4src = IP4_ADDR_FULL_MASK;
+		ip_mask->psrc = PORT_FULL_MASK;
 	}
 	rule->flow_type = (proto == IPPROTO_TCP) ? TCP_V4_FLOW : UDP_V4_FLOW;
-	ip_mask->ip4dst = ~0;
-	ip_mask->pdst = ~0;
+	ip_mask->ip4dst = IP4_ADDR_FULL_MASK;
+	ip_mask->pdst = PORT_FULL_MASK;
 	return rc;
 }
 
@@ -971,11 +975,12 @@ static int efx_ethtool_set_class_rule(struct efx_nic *efx,
 
 	/* Check for unsupported extensions */
 	if ((rule->flow_type & FLOW_EXT) &&
-	    (rule->m_ext.vlan_etype | rule->m_ext.data[0] |
+	    (rule->m_ext.vlan_etype || rule->m_ext.data[0] ||
 	     rule->m_ext.data[1]))
 		return -EINVAL;
 
-	efx_filter_init_rx(&spec, EFX_FILTER_PRI_MANUAL, 0,
+	efx_filter_init_rx(&spec, EFX_FILTER_PRI_MANUAL,
+			   efx->rx_scatter ? EFX_FILTER_FLAG_RX_SCATTER : 0,
 			   (rule->ring_cookie == RX_CLS_FLOW_DISC) ?
 			   0xfff : rule->ring_cookie);
 
@@ -986,16 +991,16 @@ static int efx_ethtool_set_class_rule(struct efx_nic *efx,
 			    IPPROTO_TCP : IPPROTO_UDP);
 
 		/* Must match all of destination, */
-		if ((__force u32)~ip_mask->ip4dst |
-		    (__force u16)~ip_mask->pdst)
+		if (!(ip_mask->ip4dst == IP4_ADDR_FULL_MASK &&
+		      ip_mask->pdst == PORT_FULL_MASK))
 			return -EINVAL;
 		/* all or none of source, */
-		if ((ip_mask->ip4src | ip_mask->psrc) &&
-		    ((__force u32)~ip_mask->ip4src |
-		     (__force u16)~ip_mask->psrc))
+		if ((ip_mask->ip4src || ip_mask->psrc) &&
+		    !(ip_mask->ip4src == IP4_ADDR_FULL_MASK &&
+		      ip_mask->psrc == PORT_FULL_MASK))
 			return -EINVAL;
 		/* and nothing else */
-		if (ip_mask->tos | rule->m_ext.vlan_tci)
+		if (ip_mask->tos || rule->m_ext.vlan_tci)
 			return -EINVAL;
 
 		if (ip_mask->ip4src)
@@ -1109,6 +1114,20 @@ static int efx_ethtool_set_rxfh_indir(struct net_device *net_dev,
 	return 0;
 }
 
+int efx_ethtool_get_ts_info(struct net_device *net_dev,
+			    struct ethtool_ts_info *ts_info)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+
+	/* Software capabilities */
+	ts_info->so_timestamping = (SOF_TIMESTAMPING_RX_SOFTWARE |
+				    SOF_TIMESTAMPING_SOFTWARE);
+	ts_info->phc_index = -1;
+
+	efx_ptp_get_ts_info(efx, ts_info);
+	return 0;
+}
+
 static int efx_ethtool_get_module_eeprom(struct net_device *net_dev,
 					 struct ethtool_eeprom *ee,
 					 u8 *data)
@@ -1171,7 +1190,7 @@ const struct ethtool_ops efx_ethtool_ops = {
 	.get_rxfh_indir_size	= efx_ethtool_get_rxfh_indir_size,
 	.get_rxfh_indir		= efx_ethtool_get_rxfh_indir,
 	.set_rxfh_indir		= efx_ethtool_set_rxfh_indir,
-	.get_ts_info		= efx_ptp_get_ts_info,
+	.get_ts_info		= efx_ethtool_get_ts_info,
 	.get_module_info	= efx_ethtool_get_module_info,
 	.get_module_eeprom	= efx_ethtool_get_module_eeprom,
 };

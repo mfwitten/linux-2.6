@@ -46,7 +46,6 @@
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/module.h>
-#include <linux/pinctrl/consumer.h>
 #include <linux/stmp_device.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/mxs-spi.h>
@@ -74,12 +73,6 @@ static int mxs_spi_setup_transfer(struct spi_device *dev,
 	bits_per_word = dev->bits_per_word;
 	if (t && t->bits_per_word)
 		bits_per_word = t->bits_per_word;
-
-	if (bits_per_word != 8) {
-		dev_err(&dev->dev, "%s, unsupported bits_per_word=%d\n",
-					__func__, bits_per_word);
-		return -EINVAL;
-	}
 
 	hz = dev->max_speed_hz;
 	if (t && t->speed_hz)
@@ -241,6 +234,7 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
 	INIT_COMPLETION(spi->c);
 
 	ctrl0 = readl(ssp->base + HW_SSP_CTRL0);
+	ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT;
 	ctrl0 |= BM_SSP_CTRL0_DATA_XFER | mxs_spi_cs_to_reg(cs);
 
 	if (*first)
@@ -256,8 +250,10 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
 		if ((sg_count + 1 == sgs) && *last)
 			ctrl0 |= BM_SSP_CTRL0_IGNORE_CRC;
 
-		if (ssp->devid == IMX23_SSP)
+		if (ssp->devid == IMX23_SSP) {
+			ctrl0 &= ~BM_SSP_CTRL0_XFER_COUNT;
 			ctrl0 |= min;
+		}
 
 		dma_xfer[sg_count].pio[0] = ctrl0;
 		dma_xfer[sg_count].pio[3] = min;
@@ -323,6 +319,7 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
 	if (!ret) {
 		dev_err(ssp->dev, "DMA transfer timeout\n");
 		ret = -ETIMEDOUT;
+		dmaengine_terminate_all(ssp->dmach);
 		goto err_vmalloc;
 	}
 
@@ -480,25 +477,10 @@ static int mxs_spi_transfer_one(struct spi_master *master,
 		first = last = 0;
 	}
 
-	m->status = 0;
+	m->status = status;
 	spi_finalize_current_message(master);
 
 	return status;
-}
-
-static bool mxs_ssp_dma_filter(struct dma_chan *chan, void *param)
-{
-	struct mxs_ssp *ssp = param;
-
-	if (!mxs_dma_is_apbh(chan))
-		return false;
-
-	if (chan->chan_id != ssp->dma_channel)
-		return false;
-
-	chan->private = &ssp->dma_data;
-
-	return true;
 }
 
 static const struct of_device_id mxs_spi_dt_ids[] = {
@@ -508,7 +490,7 @@ static const struct of_device_id mxs_spi_dt_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, mxs_spi_dt_ids);
 
-static int __devinit mxs_spi_probe(struct platform_device *pdev)
+static int mxs_spi_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *of_id =
 			of_match_device(mxs_spi_dt_ids, &pdev->dev);
@@ -516,13 +498,11 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
 	struct spi_master *master;
 	struct mxs_spi *spi;
 	struct mxs_ssp *ssp;
-	struct resource *iores, *dmares;
-	struct pinctrl *pinctrl;
+	struct resource *iores;
 	struct clk *clk;
 	void __iomem *base;
-	int devid, dma_channel, clk_freq;
-	int ret = 0, irq_err, irq_dma;
-	dma_cap_mask_t mask;
+	int devid, clk_freq;
+	int ret = 0, irq_err;
 
 	/*
 	 * Default clock speed for the SPI core. 160MHz seems to
@@ -533,48 +513,22 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
 
 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	irq_err = platform_get_irq(pdev, 0);
-	irq_dma = platform_get_irq(pdev, 1);
-	if (!iores || irq_err < 0 || irq_dma < 0)
+	if (!iores || irq_err < 0)
 		return -EINVAL;
 
-	base = devm_request_and_ioremap(&pdev->dev, iores);
-	if (!base)
-		return -EADDRNOTAVAIL;
-
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl))
-		return PTR_ERR(pinctrl);
+	base = devm_ioremap_resource(&pdev->dev, iores);
+	if (IS_ERR(base))
+		return PTR_ERR(base);
 
 	clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(clk))
 		return PTR_ERR(clk);
 
-	if (np) {
-		devid = (enum mxs_ssp_id) of_id->data;
-		/*
-		 * TODO: This is a temporary solution and should be changed
-		 * to use generic DMA binding later when the helpers get in.
-		 */
-		ret = of_property_read_u32(np, "fsl,ssp-dma-channel",
-					   &dma_channel);
-		if (ret) {
-			dev_err(&pdev->dev,
-				"Failed to get DMA channel\n");
-			return -EINVAL;
-		}
-
-		ret = of_property_read_u32(np, "clock-frequency",
-					   &clk_freq);
-		if (ret)
-			clk_freq = clk_freq_default;
-	} else {
-		dmares = platform_get_resource(pdev, IORESOURCE_DMA, 0);
-		if (!dmares)
-			return -EINVAL;
-		devid = pdev->id_entry->driver_data;
-		dma_channel = dmares->start;
+	devid = (enum mxs_ssp_id) of_id->data;
+	ret = of_property_read_u32(np, "clock-frequency",
+				   &clk_freq);
+	if (ret)
 		clk_freq = clk_freq_default;
-	}
 
 	master = spi_alloc_master(&pdev->dev, sizeof(*spi));
 	if (!master)
@@ -582,6 +536,7 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
 
 	master->transfer_one_message = mxs_spi_transfer_one;
 	master->setup = mxs_spi_setup;
+	master->bits_per_word_mask = SPI_BPW_MASK(8);
 	master->mode_bits = SPI_CPOL | SPI_CPHA;
 	master->num_chipselect = 3;
 	master->dev.of_node = np;
@@ -593,7 +548,6 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
 	ssp->clk = clk;
 	ssp->base = base;
 	ssp->devid = devid;
-	ssp->dma_channel = dma_channel;
 
 	init_completion(&spi->c);
 
@@ -602,12 +556,10 @@ static int __devinit mxs_spi_probe(struct platform_device *pdev)
 	if (ret)
 		goto out_master_free;
 
-	dma_cap_zero(mask);
-	dma_cap_set(DMA_SLAVE, mask);
-	ssp->dma_data.chan_irq = irq_dma;
-	ssp->dmach = dma_request_channel(mask, mxs_ssp_dma_filter, ssp);
+	ssp->dmach = dma_request_slave_channel(&pdev->dev, "rx-tx");
 	if (!ssp->dmach) {
 		dev_err(ssp->dev, "Failed to request DMA\n");
+		ret = -ENODEV;
 		goto out_master_free;
 	}
 
@@ -635,7 +587,7 @@ out_master_free:
 	return ret;
 }
 
-static int __devexit mxs_spi_remove(struct platform_device *pdev)
+static int mxs_spi_remove(struct platform_device *pdev)
 {
 	struct spi_master *master;
 	struct mxs_spi *spi;
@@ -658,7 +610,7 @@ static int __devexit mxs_spi_remove(struct platform_device *pdev)
 
 static struct platform_driver mxs_spi_driver = {
 	.probe	= mxs_spi_probe,
-	.remove	= __devexit_p(mxs_spi_remove),
+	.remove	= mxs_spi_remove,
 	.driver	= {
 		.name	= DRIVER_NAME,
 		.owner	= THIS_MODULE,

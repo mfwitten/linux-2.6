@@ -705,7 +705,7 @@ static const struct net_device_ops sh_sir_ndo = {
 
 
 ************************************************************************/
-static int __devinit sh_sir_probe(struct platform_device *pdev)
+static int sh_sir_probe(struct platform_device *pdev)
 {
 	struct net_device *ndev;
 	struct sh_sir_self *self;
@@ -783,7 +783,7 @@ exit:
 	return err;
 }
 
-static int __devexit sh_sir_remove(struct platform_device *pdev)
+static int sh_sir_remove(struct platform_device *pdev)
 {
 	struct net_device *ndev = platform_get_drvdata(pdev);
 	struct sh_sir_self *self = netdev_priv(ndev);
@@ -796,14 +796,13 @@ static int __devexit sh_sir_remove(struct platform_device *pdev)
 	sh_sir_remove_iobuf(self);
 	iounmap(self->membase);
 	free_netdev(ndev);
-	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
 
 static struct platform_driver sh_sir_driver = {
 	.probe   = sh_sir_probe,
-	.remove  = __devexit_p(sh_sir_remove),
+	.remove  = sh_sir_remove,
 	.driver  = {
 		.name = DRIVER_NAME,
 	},

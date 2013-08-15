@@ -551,7 +551,6 @@ void w1_destroy_master_attributes(struct w1_master *master)
 	sysfs_remove_group(&master->dev.kobj, &w1_master_defattr_group);
 }
 
-#ifdef CONFIG_HOTPLUG
 static int w1_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
 	struct w1_master *md = NULL;
@@ -587,12 +586,6 @@ static int w1_uevent(struct device *dev, struct kobj_uevent_env *env)
 end:
 	return err;
 }
-#else
-static int w1_uevent(struct device *dev, struct kobj_uevent_env *env)
-{
-	return 0;
-}
-#endif
 
 static int __w1_attach_slave_device(struct w1_slave *sl)
 {
@@ -686,6 +679,8 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 	memcpy(&sl->reg_num, rn, sizeof(sl->reg_num));
 	atomic_set(&sl->refcnt, 0);
 	init_completion(&sl->released);
+
+	request_module("w1-family-0x%0x", rn->family);
 
 	spin_lock(&w1_flock);
 	f = w1_family_registered(rn->family);
@@ -931,7 +926,8 @@ void w1_search(struct w1_master *dev, u8 search_type, w1_slave_found_callback cb
 			tmp64 = (triplet_ret >> 2);
 			rn |= (tmp64 << i);
 
-			if (kthread_should_stop()) {
+			/* ensure we're called from kthread and not by netlink callback */
+			if (!dev->priv && kthread_should_stop()) {
 				mutex_unlock(&dev->bus_mutex);
 				dev_dbg(&dev->dev, "Abort w1_search\n");
 				return;

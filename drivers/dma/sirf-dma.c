@@ -16,6 +16,7 @@
 #include <linux/of_address.h>
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
+#include <linux/clk.h>
 #include <linux/sirfsoc_dma.h>
 
 #include "dmaengine.h"
@@ -32,7 +33,9 @@
 #define SIRFSOC_DMA_CH_VALID                    0x140
 #define SIRFSOC_DMA_CH_INT                      0x144
 #define SIRFSOC_DMA_INT_EN                      0x148
+#define SIRFSOC_DMA_INT_EN_CLR			0x14C
 #define SIRFSOC_DMA_CH_LOOP_CTRL                0x150
+#define SIRFSOC_DMA_CH_LOOP_CTRL_CLR            0x15C
 
 #define SIRFSOC_DMA_MODE_CTRL_BIT               4
 #define SIRFSOC_DMA_DIR_CTRL_BIT                5
@@ -76,6 +79,8 @@ struct sirfsoc_dma {
 	struct sirfsoc_dma_chan		channels[SIRFSOC_DMA_CHANNELS];
 	void __iomem			*base;
 	int				irq;
+	struct clk			*clk;
+	bool				is_marco;
 };
 
 #define DRV_NAME	"sirfsoc_dma"
@@ -109,7 +114,7 @@ static void sirfsoc_dma_execute(struct sirfsoc_dma_chan *schan)
 	sdesc = list_first_entry(&schan->queued, struct sirfsoc_dma_desc,
 		node);
 	/* Move the first queued descriptor to active list */
-	list_move_tail(&schan->queued, &schan->active);
+	list_move_tail(&sdesc->node, &schan->active);
 
 	/* Start the DMA transfer */
 	writel_relaxed(sdesc->width, sdma->base + SIRFSOC_DMA_WIDTH_0 +
@@ -288,17 +293,67 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
 	int cid = schan->chan.chan_id;
 	unsigned long flags;
 
-	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) &
-		~(1 << cid), sdma->base + SIRFSOC_DMA_INT_EN);
+	spin_lock_irqsave(&schan->lock, flags);
+
+	if (!sdma->is_marco) {
+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) &
+			~(1 << cid), sdma->base + SIRFSOC_DMA_INT_EN);
+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+			& ~((1 << cid) | 1 << (cid + 16)),
+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+	} else {
+		writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_INT_EN_CLR);
+		writel_relaxed((1 << cid) | 1 << (cid + 16),
+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+	}
+
 	writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_VALID);
 
-	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
-		& ~((1 << cid) | 1 << (cid + 16)),
-			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
-
-	spin_lock_irqsave(&schan->lock, flags);
 	list_splice_tail_init(&schan->active, &schan->free);
 	list_splice_tail_init(&schan->queued, &schan->free);
+
+	spin_unlock_irqrestore(&schan->lock, flags);
+
+	return 0;
+}
+
+static int sirfsoc_dma_pause_chan(struct sirfsoc_dma_chan *schan)
+{
+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
+	int cid = schan->chan.chan_id;
+	unsigned long flags;
+
+	spin_lock_irqsave(&schan->lock, flags);
+
+	if (!sdma->is_marco)
+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+			& ~((1 << cid) | 1 << (cid + 16)),
+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+	else
+		writel_relaxed((1 << cid) | 1 << (cid + 16),
+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+
+	spin_unlock_irqrestore(&schan->lock, flags);
+
+	return 0;
+}
+
+static int sirfsoc_dma_resume_chan(struct sirfsoc_dma_chan *schan)
+{
+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
+	int cid = schan->chan.chan_id;
+	unsigned long flags;
+
+	spin_lock_irqsave(&schan->lock, flags);
+
+	if (!sdma->is_marco)
+		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+			| ((1 << cid) | 1 << (cid + 16)),
+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+	else
+		writel_relaxed((1 << cid) | 1 << (cid + 16),
+			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+
 	spin_unlock_irqrestore(&schan->lock, flags);
 
 	return 0;
@@ -311,6 +366,10 @@ static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
 	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
 
 	switch (cmd) {
+	case DMA_PAUSE:
+		return sirfsoc_dma_pause_chan(schan);
+	case DMA_RESUME:
+		return sirfsoc_dma_resume_chan(schan);
 	case DMA_TERMINATE_ALL:
 		return sirfsoc_dma_terminate_all(schan);
 	case DMA_SLAVE_CONFIG:
@@ -407,12 +466,29 @@ static enum dma_status
 sirfsoc_dma_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
 	struct dma_tx_state *txstate)
 {
+	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
 	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
 	unsigned long flags;
 	enum dma_status ret;
+	struct sirfsoc_dma_desc *sdesc;
+	int cid = schan->chan.chan_id;
+	unsigned long dma_pos;
+	unsigned long dma_request_bytes;
+	unsigned long residue;
 
 	spin_lock_irqsave(&schan->lock, flags);
+
+	sdesc = list_first_entry(&schan->active, struct sirfsoc_dma_desc,
+			node);
+	dma_request_bytes = (sdesc->xlen + 1) * (sdesc->ylen + 1) *
+		(sdesc->width * SIRFSOC_DMA_WORD_LEN);
+
 	ret = dma_cookie_status(chan, cookie, txstate);
+	dma_pos = readl_relaxed(sdma->base + cid * 0x10 + SIRFSOC_DMA_CH_ADDR)
+		<< 2;
+	residue = dma_request_bytes - (dma_pos - sdesc->addr);
+	dma_set_residue(txstate, residue);
+
 	spin_unlock_irqrestore(&schan->lock, flags);
 
 	return ret;
@@ -428,7 +504,7 @@ static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
 	unsigned long iflags;
 	int ret;
 
-	if ((xt->dir != DMA_MEM_TO_DEV) || (xt->dir != DMA_DEV_TO_MEM)) {
+	if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM)) {
 		ret = -EINVAL;
 		goto err_dir;
 	}
@@ -550,7 +626,7 @@ bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id)
 }
 EXPORT_SYMBOL(sirfsoc_dma_filter_id);
 
-static int __devinit sirfsoc_dma_probe(struct platform_device *op)
+static int sirfsoc_dma_probe(struct platform_device *op)
 {
 	struct device_node *dn = op->dev.of_node;
 	struct device *dev = &op->dev;
@@ -568,6 +644,9 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
 		return -ENOMEM;
 	}
 
+	if (of_device_is_compatible(dn, "sirf,marco-dmac"))
+		sdma->is_marco = true;
+
 	if (of_property_read_u32(dn, "cell-index", &id)) {
 		dev_err(dev, "Fail to get DMAC index\n");
 		return -ENODEV;
@@ -577,6 +656,12 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
 	if (sdma->irq == NO_IRQ) {
 		dev_err(dev, "Error mapping IRQ!\n");
 		return -EINVAL;
+	}
+
+	sdma->clk = devm_clk_get(dev, NULL);
+	if (IS_ERR(sdma->clk)) {
+		dev_err(dev, "failed to get a clock.\n");
+		return PTR_ERR(sdma->clk);
 	}
 
 	ret = of_address_to_resource(dn, 0, &res);
@@ -638,6 +723,8 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
 
 	tasklet_init(&sdma->tasklet, sirfsoc_dma_tasklet, (unsigned long)sdma);
 
+	clk_prepare_enable(sdma->clk);
+
 	/* Register DMA engine */
 	dev_set_drvdata(dev, sdma);
 	ret = dma_async_device_register(dma);
@@ -655,11 +742,12 @@ irq_dispose:
 	return ret;
 }
 
-static int __devexit sirfsoc_dma_remove(struct platform_device *op)
+static int sirfsoc_dma_remove(struct platform_device *op)
 {
 	struct device *dev = &op->dev;
 	struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
 
+	clk_disable_unprepare(sdma->clk);
 	dma_async_device_unregister(&sdma->dma);
 	free_irq(sdma->irq, sdma);
 	irq_dispose_mapping(sdma->irq);
@@ -668,12 +756,13 @@ static int __devexit sirfsoc_dma_remove(struct platform_device *op)
 
 static struct of_device_id sirfsoc_dma_match[] = {
 	{ .compatible = "sirf,prima2-dmac", },
+	{ .compatible = "sirf,marco-dmac", },
 	{},
 };
 
 static struct platform_driver sirfsoc_dma_driver = {
 	.probe		= sirfsoc_dma_probe,
-	.remove		= __devexit_p(sirfsoc_dma_remove),
+	.remove		= sirfsoc_dma_remove,
 	.driver = {
 		.name = DRV_NAME,
 		.owner = THIS_MODULE,
@@ -681,7 +770,18 @@ static struct platform_driver sirfsoc_dma_driver = {
 	},
 };
 
-module_platform_driver(sirfsoc_dma_driver);
+static __init int sirfsoc_dma_init(void)
+{
+	return platform_driver_register(&sirfsoc_dma_driver);
+}
+
+static void __exit sirfsoc_dma_exit(void)
+{
+	platform_driver_unregister(&sirfsoc_dma_driver);
+}
+
+subsys_initcall(sirfsoc_dma_init);
+module_exit(sirfsoc_dma_exit);
 
 MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
 	"Barry Song <baohua.song@csr.com>");

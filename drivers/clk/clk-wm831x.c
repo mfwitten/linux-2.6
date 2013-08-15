@@ -97,7 +97,7 @@ static int wm831x_fll_prepare(struct clk_hw *hw)
 	struct wm831x *wm831x = clkdata->wm831x;
 	int ret;
 
-	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2,
+	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_1,
 			      WM831X_FLL_ENA, WM831X_FLL_ENA);
 	if (ret != 0)
 		dev_crit(wm831x->dev, "Failed to enable FLL: %d\n", ret);
@@ -114,9 +114,9 @@ static void wm831x_fll_unprepare(struct clk_hw *hw)
 	struct wm831x *wm831x = clkdata->wm831x;
 	int ret;
 
-	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2, WM831X_FLL_ENA, 0);
+	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_1, WM831X_FLL_ENA, 0);
 	if (ret != 0)
-		dev_crit(wm831x->dev, "Failed to disaable FLL: %d\n", ret);
+		dev_crit(wm831x->dev, "Failed to disable FLL: %d\n", ret);
 }
 
 static unsigned long wm831x_fll_recalc_rate(struct clk_hw *hw,
@@ -299,8 +299,8 @@ static void wm831x_clkout_unprepare(struct clk_hw *hw)
 }
 
 static const char *wm831x_clkout_parents[] = {
-	"xtal",
 	"fll",
+	"xtal",
 };
 
 static u8 wm831x_clkout_get_parent(struct clk_hw *hw)
@@ -318,9 +318,9 @@ static u8 wm831x_clkout_get_parent(struct clk_hw *hw)
 	}
 
 	if (ret & WM831X_CLKOUT_SRC)
-		return 0;
-	else
 		return 1;
+	else
+		return 0;
 }
 
 static int wm831x_clkout_set_parent(struct clk_hw *hw, u8 parent)
@@ -350,7 +350,7 @@ static struct clk_init_data wm831x_clkout_init = {
 	.flags = CLK_SET_RATE_PARENT,
 };
 
-static __devinit int wm831x_clk_probe(struct platform_device *pdev)
+static int wm831x_clk_probe(struct platform_device *pdev)
 {
 	struct wm831x *wm831x = dev_get_drvdata(pdev->dev.parent);
 	struct wm831x_clk *clkdata;
@@ -370,49 +370,33 @@ static __devinit int wm831x_clk_probe(struct platform_device *pdev)
 	clkdata->xtal_ena = ret & WM831X_XTAL_ENA;
 
 	clkdata->xtal_hw.init = &wm831x_xtal_init;
-	clkdata->xtal = clk_register(&pdev->dev, &clkdata->xtal_hw);
-	if (!clkdata->xtal)
-		return -EINVAL;
+	clkdata->xtal = devm_clk_register(&pdev->dev, &clkdata->xtal_hw);
+	if (IS_ERR(clkdata->xtal))
+		return PTR_ERR(clkdata->xtal);
 
 	clkdata->fll_hw.init = &wm831x_fll_init;
-	clkdata->fll = clk_register(&pdev->dev, &clkdata->fll_hw);
-	if (!clkdata->fll) {
-		ret = -EINVAL;
-		goto err_xtal;
-	}
+	clkdata->fll = devm_clk_register(&pdev->dev, &clkdata->fll_hw);
+	if (IS_ERR(clkdata->fll))
+		return PTR_ERR(clkdata->fll);
 
 	clkdata->clkout_hw.init = &wm831x_clkout_init;
-	clkdata->clkout = clk_register(&pdev->dev, &clkdata->clkout_hw);
-	if (!clkdata->clkout) {
-		ret = -EINVAL;
-		goto err_fll;
-	}
+	clkdata->clkout = devm_clk_register(&pdev->dev, &clkdata->clkout_hw);
+	if (IS_ERR(clkdata->clkout))
+		return PTR_ERR(clkdata->clkout);
 
-	dev_set_drvdata(&pdev->dev, clkdata);
+	platform_set_drvdata(pdev, clkdata);
 
 	return 0;
-
-err_fll:
-	clk_unregister(clkdata->fll);
-err_xtal:
-	clk_unregister(clkdata->xtal);
-	return ret;
 }
 
-static int __devexit wm831x_clk_remove(struct platform_device *pdev)
+static int wm831x_clk_remove(struct platform_device *pdev)
 {
-	struct wm831x_clk *clkdata = dev_get_drvdata(&pdev->dev);
-
-	clk_unregister(clkdata->clkout);
-	clk_unregister(clkdata->fll);
-	clk_unregister(clkdata->xtal);
-
 	return 0;
 }
 
 static struct platform_driver wm831x_clk_driver = {
 	.probe = wm831x_clk_probe,
-	.remove = __devexit_p(wm831x_clk_remove),
+	.remove = wm831x_clk_remove,
 	.driver		= {
 		.name	= "wm831x-clk",
 		.owner	= THIS_MODULE,

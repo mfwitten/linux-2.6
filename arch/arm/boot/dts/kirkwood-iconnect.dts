@@ -1,6 +1,7 @@
 /dts-v1/;
 
 /include/ "kirkwood.dtsi"
+/include/ "kirkwood-6281.dtsi"
 
 / {
 	model = "Iomega Iconnect";
@@ -18,6 +19,48 @@
 	};
 
 	ocp@f1000000 {
+		pinctrl: pinctrl@10000 {
+			pmx_button_reset: pmx-button-reset {
+				marvell,pins = "mpp12";
+				marvell,function = "gpio";
+			};
+			pmx_button_otb: pmx-button-otb {
+				marvell,pins = "mpp35";
+				marvell,function = "gpio";
+			};
+			pmx_led_level: pmx-led-level {
+				marvell,pins = "mpp41";
+				marvell,function = "gpio";
+			};
+			pmx_led_power_blue: pmx-led-power-blue {
+				marvell,pins = "mpp42";
+				marvell,function = "gpio";
+			};
+			pmx_led_power_red: pmx-power-red {
+				marvell,pins = "mpp43";
+				marvell,function = "gpio";
+			};
+			pmx_led_usb1: pmx-led-usb1 {
+				marvell,pins = "mpp44";
+				marvell,function = "gpio";
+			};
+			pmx_led_usb2: pmx-led-usb2 {
+				marvell,pins = "mpp45";
+				marvell,function = "gpio";
+			};
+			pmx_led_usb3: pmx-led-usb3 {
+				marvell,pins = "mpp46";
+				marvell,function = "gpio";
+			};
+			pmx_led_usb4: pmx-led-usb4 {
+				marvell,pins = "mpp47";
+				marvell,function = "gpio";
+			};
+			pmx_led_otb: pmx-led-otb {
+				marvell,pins = "mpp48";
+				marvell,function = "gpio";
+			};
+		};
 		i2c@11000 {
 			status = "okay";
 
@@ -27,7 +70,6 @@
 			};
 		};
 		serial@12000 {
-			clock-frequency = <200000000>;
 			status = "ok";
 		};
 
@@ -59,10 +101,23 @@
 				reg = <0x980000 0x1f400000>;
 			};
 		};
+
+		pcie-controller {
+			status = "okay";
+
+			pcie@1,0 {
+				status = "okay";
+			};
+		};
 	};
 
 	gpio-leds {
 		compatible = "gpio-leds";
+		pinctrl-0 = < &pmx_led_level &pmx_led_power_blue
+			      &pmx_led_power_red &pmx_led_usb1
+			      &pmx_led_usb2 &pmx_led_usb3
+			      &pmx_led_usb4 &pmx_led_otb >;
+		pinctrl-names = "default";
 
 		led-level {
 			label = "led_level";
@@ -104,6 +159,9 @@
 		compatible = "gpio-keys";
 		#address-cells = <1>;
 		#size-cells = <0>;
+		pinctrl-0 = < &pmx_button_reset &pmx_button_otb >;
+		pinctrl-names = "default";
+
 		button@1 {
 			label = "OTB Button";
 			linux,code = <133>;

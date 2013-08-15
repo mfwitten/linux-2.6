@@ -128,7 +128,7 @@ static inline int pxamci_set_power(struct pxamci_host *host,
 			       !!on ^ host->pdata->gpio_power_invert);
 	}
 	if (!host->vcc && host->pdata && host->pdata->setpower)
-		host->pdata->setpower(mmc_dev(host->mmc), vdd);
+		return host->pdata->setpower(mmc_dev(host->mmc), vdd);
 
 	return 0;
 }
@@ -584,7 +584,7 @@ static const struct of_device_id pxa_mmc_dt_ids[] = {
 
 MODULE_DEVICE_TABLE(of, pxa_mmc_dt_ids);
 
-static int __devinit pxamci_of_init(struct platform_device *pdev)
+static int pxamci_of_init(struct platform_device *pdev)
 {
         struct device_node *np = pdev->dev.of_node;
         struct pxamci_platform_data *pdata;
@@ -614,7 +614,7 @@ static int __devinit pxamci_of_init(struct platform_device *pdev)
         return 0;
 }
 #else
-static int __devinit pxamci_of_init(struct platform_device *pdev)
+static int pxamci_of_init(struct platform_device *pdev)
 {
         return 0;
 }
@@ -833,8 +833,6 @@ static int pxamci_remove(struct platform_device *pdev)
 {
 	struct mmc_host *mmc = platform_get_drvdata(pdev);
 	int gpio_cd = -1, gpio_ro = -1, gpio_power = -1;
-
-	platform_set_drvdata(pdev, NULL);
 
 	if (mmc) {
 		struct pxamci_host *host = mmc_priv(mmc);

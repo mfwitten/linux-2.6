@@ -53,6 +53,7 @@ int radeon_gem_object_create(struct radeon_device *rdev, int size,
 				struct drm_gem_object **obj)
 {
 	struct radeon_bo *robj;
+	unsigned long max_size;
 	int r;
 
 	*obj = NULL;
@@ -60,14 +61,30 @@ int radeon_gem_object_create(struct radeon_device *rdev, int size,
 	if (alignment < PAGE_SIZE) {
 		alignment = PAGE_SIZE;
 	}
+
+	/* maximun bo size is the minimun btw visible vram and gtt size */
+	max_size = min(rdev->mc.visible_vram_size, rdev->mc.gtt_size);
+	if (size > max_size) {
+		printk(KERN_WARNING "%s:%d alloc size %dMb bigger than %ldMb limit\n",
+		       __func__, __LINE__, size >> 20, max_size >> 20);
+		return -ENOMEM;
+	}
+
+retry:
 	r = radeon_bo_create(rdev, size, alignment, kernel, initial_domain, NULL, &robj);
 	if (r) {
-		if (r != -ERESTARTSYS)
+		if (r != -ERESTARTSYS) {
+			if (initial_domain == RADEON_GEM_DOMAIN_VRAM) {
+				initial_domain |= RADEON_GEM_DOMAIN_GTT;
+				goto retry;
+			}
 			DRM_ERROR("Failed to allocate GEM object (%d, %d, %u, %d)\n",
 				  size, initial_domain, alignment, r);
+		}
 		return r;
 	}
 	*obj = &robj->gem_base;
+	robj->pid = task_pid_nr(current);
 
 	mutex_lock(&rdev->gem.mutex);
 	list_add_tail(&robj->list, &rdev->gem.objects);
@@ -558,4 +575,53 @@ int radeon_mode_dumb_destroy(struct drm_file *file_priv,
 			     uint32_t handle)
 {
 	return drm_gem_handle_delete(file_priv, handle);
+}
+
+#if defined(CONFIG_DEBUG_FS)
+static int radeon_debugfs_gem_info(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = (struct drm_info_node *)m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct radeon_device *rdev = dev->dev_private;
+	struct radeon_bo *rbo;
+	unsigned i = 0;
+
+	mutex_lock(&rdev->gem.mutex);
+	list_for_each_entry(rbo, &rdev->gem.objects, list) {
+		unsigned domain;
+		const char *placement;
+
+		domain = radeon_mem_type_to_domain(rbo->tbo.mem.mem_type);
+		switch (domain) {
+		case RADEON_GEM_DOMAIN_VRAM:
+			placement = "VRAM";
+			break;
+		case RADEON_GEM_DOMAIN_GTT:
+			placement = " GTT";
+			break;
+		case RADEON_GEM_DOMAIN_CPU:
+		default:
+			placement = " CPU";
+			break;
+		}
+		seq_printf(m, "bo[0x%08x] %8ldkB %8ldMB %s pid %8ld\n",
+			   i, radeon_bo_size(rbo) >> 10, radeon_bo_size(rbo) >> 20,
+			   placement, (unsigned long)rbo->pid);
+		i++;
+	}
+	mutex_unlock(&rdev->gem.mutex);
+	return 0;
+}
+
+static struct drm_info_list radeon_debugfs_gem_list[] = {
+	{"radeon_gem_info", &radeon_debugfs_gem_info, 0, NULL},
+};
+#endif
+
+int radeon_gem_debugfs_init(struct radeon_device *rdev)
+{
+#if defined(CONFIG_DEBUG_FS)
+	return radeon_debugfs_add_files(rdev, radeon_debugfs_gem_list, 1);
+#endif
+	return 0;
 }

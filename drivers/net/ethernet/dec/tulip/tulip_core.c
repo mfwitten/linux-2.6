@@ -37,7 +37,7 @@
 #include <asm/prom.h>
 #endif
 
-static char version[] __devinitdata =
+static char version[] =
 	"Linux Tulip driver version " DRV_VERSION " (" DRV_RELDATE ")\n";
 
 /* A few user-configurable values. */
@@ -1191,8 +1191,7 @@ static void set_rx_mode(struct net_device *dev)
 }
 
 #ifdef CONFIG_TULIP_MWI
-static void __devinit tulip_mwi_config (struct pci_dev *pdev,
-					struct net_device *dev)
+static void tulip_mwi_config(struct pci_dev *pdev, struct net_device *dev)
 {
 	struct tulip_private *tp = netdev_priv(dev);
 	u8 cache;
@@ -1301,8 +1300,7 @@ DEFINE_PCI_DEVICE_TABLE(early_486_chipsets) = {
 	{ },
 };
 
-static int __devinit tulip_init_one (struct pci_dev *pdev,
-				     const struct pci_device_id *ent)
+static int tulip_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct tulip_private *tp;
 	/* See note below on the multiport cards. */
@@ -1410,12 +1408,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	if (i) {
 		pr_err("Cannot enable tulip board #%d, aborting\n", board_idx);
 		return i;
-	}
-
-	/* The chip will fail to enter a low-power state later unless
-	 * first explicitly commanded into D0 */
-	if (pci_set_power_state(pdev, PCI_D0)) {
-		pr_notice("Failed to set power state to D0\n");
 	}
 
 	irq = pdev->irq;
@@ -1927,7 +1919,7 @@ static int tulip_resume(struct pci_dev *pdev)
 #endif /* CONFIG_PM */
 
 
-static void __devexit tulip_remove_one (struct pci_dev *pdev)
+static void tulip_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
 	struct tulip_private *tp;
@@ -1974,7 +1966,7 @@ static struct pci_driver tulip_driver = {
 	.name		= DRV_NAME,
 	.id_table	= tulip_pci_tbl,
 	.probe		= tulip_init_one,
-	.remove		= __devexit_p(tulip_remove_one),
+	.remove		= tulip_remove_one,
 #ifdef CONFIG_PM
 	.suspend	= tulip_suspend,
 	.resume		= tulip_resume,

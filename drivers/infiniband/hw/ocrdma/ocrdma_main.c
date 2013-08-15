@@ -51,18 +51,6 @@ static DEFINE_IDR(ocrdma_dev_id);
 
 static union ib_gid ocrdma_zero_sgid;
 
-static int ocrdma_get_instance(void)
-{
-	int instance = 0;
-
-	/* Assign an unused number */
-	if (!idr_pre_get(&ocrdma_dev_id, GFP_KERNEL))
-		return -1;
-	if (idr_get_new(&ocrdma_dev_id, NULL, &instance))
-		return -1;
-	return instance;
-}
-
 void ocrdma_get_guid(struct ocrdma_dev *dev, u8 *guid)
 {
 	u8 mac_addr[6];
@@ -390,7 +378,7 @@ static int ocrdma_alloc_resources(struct ocrdma_dev *dev)
 	spin_lock_init(&dev->flush_q_lock);
 	return 0;
 alloc_err:
-	ocrdma_err("%s(%d) error.\n", __func__, dev->id);
+	pr_err("%s(%d) error.\n", __func__, dev->id);
 	return -ENOMEM;
 }
 
@@ -408,7 +396,7 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
 
 	dev = (struct ocrdma_dev *)ib_alloc_device(sizeof(struct ocrdma_dev));
 	if (!dev) {
-		ocrdma_err("Unable to allocate ib device\n");
+		pr_err("Unable to allocate ib device\n");
 		return NULL;
 	}
 	dev->mbx_cmd = kzalloc(sizeof(struct ocrdma_mqe_emb_cmd), GFP_KERNEL);
@@ -416,7 +404,7 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
 		goto idr_err;
 
 	memcpy(&dev->nic_info, dev_info, sizeof(*dev_info));
-	dev->id = ocrdma_get_instance();
+	dev->id = idr_alloc(&ocrdma_dev_id, NULL, 0, 0, GFP_KERNEL);
 	if (dev->id < 0)
 		goto idr_err;
 
@@ -449,7 +437,7 @@ init_err:
 idr_err:
 	kfree(dev->mbx_cmd);
 	ib_dealloc_device(&dev->ibdev);
-	ocrdma_err("%s() leaving. ret=%d\n", __func__, status);
+	pr_err("%s() leaving. ret=%d\n", __func__, status);
 	return NULL;
 }
 

@@ -10,8 +10,6 @@ struct nvbios_pll;
 struct nouveau_clock {
 	struct nouveau_subdev base;
 
-	int (*pll_set)(struct nouveau_clock *, u32 type, u32 freq);
-
 	/*XXX: die, these are here *only* to support the completely
 	 *     bat-shit insane what-was-nouveau_hw.c code
 	 */
@@ -54,6 +52,7 @@ int nv04_clock_pll_calc(struct nouveau_clock *, struct nvbios_pll *,
 			int clk, struct nouveau_pll_vals *);
 int nv04_clock_pll_prog(struct nouveau_clock *, u32 reg1,
 			struct nouveau_pll_vals *);
-
+int nva3_clock_pll_calc(struct nouveau_clock *, struct nvbios_pll *,
+			int clk, struct nouveau_pll_vals *);
 
 #endif

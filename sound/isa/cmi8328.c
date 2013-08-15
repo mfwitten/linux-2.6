@@ -140,7 +140,7 @@ static void snd_cmi8328_cfg_restore(u16 port, u8 cfg[])
 	snd_cmi8328_cfg_write(port, CFG3, cfg[2]);
 }
 
-static int __devinit snd_cmi8328_mixer(struct snd_wss *chip)
+static int snd_cmi8328_mixer(struct snd_wss *chip)
 {
 	struct snd_card *card;
 	struct snd_ctl_elem_id id1, id2;
@@ -212,7 +212,7 @@ int array_find_l(long array[], long item)
 	return -1;
 }
 
-static int __devinit snd_cmi8328_probe(struct device *pdev, unsigned int ndev)
+static int snd_cmi8328_probe(struct device *pdev, unsigned int ndev)
 {
 	struct snd_card *card;
 	struct snd_opl3 *opl3;
@@ -401,7 +401,7 @@ error:
 	return err;
 }
 
-static int __devexit snd_cmi8328_remove(struct device *pdev, unsigned int dev)
+static int snd_cmi8328_remove(struct device *pdev, unsigned int dev)
 {
 	struct snd_card *card = dev_get_drvdata(pdev);
 	struct snd_cmi8328 *cmi = card->private_data;
@@ -418,7 +418,6 @@ static int __devexit snd_cmi8328_remove(struct device *pdev, unsigned int dev)
 	snd_cmi8328_cfg_write(cmi->port, CFG2, 0);
 	snd_cmi8328_cfg_write(cmi->port, CFG3, 0);
 	snd_card_free(card);
-	dev_set_drvdata(pdev, NULL);
 	return 0;
 }
 
@@ -459,7 +458,7 @@ static int snd_cmi8328_resume(struct device *pdev, unsigned int n)
 
 static struct isa_driver snd_cmi8328_driver = {
 	.probe		= snd_cmi8328_probe,
-	.remove		= __devexit_p(snd_cmi8328_remove),
+	.remove		= snd_cmi8328_remove,
 #ifdef CONFIG_PM
 	.suspend	= snd_cmi8328_suspend,
 	.resume		= snd_cmi8328_resume,

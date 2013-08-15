@@ -149,8 +149,7 @@ static struct of_device_id rotary_encoder_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, rotary_encoder_of_match);
 
-static struct rotary_encoder_platform_data * __devinit
-rotary_encoder_parse_dt(struct device *dev)
+static struct rotary_encoder_platform_data *rotary_encoder_parse_dt(struct device *dev)
 {
 	const struct of_device_id *of_id =
 				of_match_device(rotary_encoder_of_match, dev);
@@ -192,7 +191,7 @@ rotary_encoder_parse_dt(struct device *dev)
 }
 #endif
 
-static int __devinit rotary_encoder_probe(struct platform_device *pdev)
+static int rotary_encoder_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	const struct rotary_encoder_platform_data *pdata = dev_get_platdata(dev);
@@ -302,7 +301,7 @@ exit_free_mem:
 	return err;
 }
 
-static int __devexit rotary_encoder_remove(struct platform_device *pdev)
+static int rotary_encoder_remove(struct platform_device *pdev)
 {
 	struct rotary_encoder *encoder = platform_get_drvdata(pdev);
 	const struct rotary_encoder_platform_data *pdata = encoder->pdata;
@@ -318,14 +317,12 @@ static int __devexit rotary_encoder_remove(struct platform_device *pdev)
 	if (!dev_get_platdata(&pdev->dev))
 		kfree(pdata);
 
-	platform_set_drvdata(pdev, NULL);
-
 	return 0;
 }
 
 static struct platform_driver rotary_encoder_driver = {
 	.probe		= rotary_encoder_probe,
-	.remove		= __devexit_p(rotary_encoder_remove),
+	.remove		= rotary_encoder_remove,
 	.driver		= {
 		.name	= DRV_NAME,
 		.owner	= THIS_MODULE,

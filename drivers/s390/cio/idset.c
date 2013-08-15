@@ -17,7 +17,7 @@ struct idset {
 
 static inline unsigned long bitmap_size(int num_ssid, int num_id)
 {
-	return __BITOPS_WORDS(num_ssid * num_id) * sizeof(unsigned long);
+	return BITS_TO_LONGS(num_ssid * num_id) * sizeof(unsigned long);
 }
 
 static struct idset *idset_new(int num_ssid, int num_id)
@@ -125,8 +125,7 @@ int idset_is_empty(struct idset *set)
 
 void idset_add_set(struct idset *to, struct idset *from)
 {
-	int len = min(__BITOPS_WORDS(to->num_ssid * to->num_id),
-		      __BITOPS_WORDS(from->num_ssid * from->num_id));
+	int len = min(to->num_ssid * to->num_id, from->num_ssid * from->num_id);
 
 	bitmap_or(to->bitmap, to->bitmap, from->bitmap, len);
 }

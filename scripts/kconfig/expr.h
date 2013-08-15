@@ -12,7 +12,7 @@ extern "C" {
 
 #include <assert.h>
 #include <stdio.h>
-#include <sys/queue.h>
+#include "list.h"
 #ifndef __cplusplus
 #include <stdbool.h>
 #endif
@@ -106,6 +106,9 @@ struct symbol {
 #define SYMBOL_DEF3       0x40000  /* symbol.def[S_DEF_3] is valid */
 #define SYMBOL_DEF4       0x80000  /* symbol.def[S_DEF_4] is valid */
 
+/* choice values need to be set before calculating this symbol value */
+#define SYMBOL_NEED_SET_CHOICE_VALUES  0x100000
+
 #define SYMBOL_MAXLENGTH	256
 #define SYMBOL_HASHSIZE		9973
 
@@ -175,12 +178,11 @@ struct menu {
 #define MENU_ROOT		0x0002
 
 struct jump_key {
-	CIRCLEQ_ENTRY(jump_key) entries;
+	struct list_head entries;
 	size_t offset;
 	struct menu *target;
 	int index;
 };
-CIRCLEQ_HEAD(jk_head, jump_key);
 
 #define JUMP_NB			9
 

@@ -603,13 +603,8 @@ SOC_DOUBLE_R("Capture Switch", WM8904_ANALOGUE_LEFT_INPUT_0,
 
 SOC_SINGLE("High Pass Filter Switch", WM8904_ADC_DIGITAL_0, 4, 1, 0),
 SOC_ENUM("High Pass Filter Mode", hpf_mode),
-
-{       .iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-	.name = "ADC 128x OSR Switch",
-	.info = snd_soc_info_volsw, .get = snd_soc_get_volsw,
-	.put = wm8904_adc_osr_put,
-	.private_value = SOC_SINGLE_VALUE(WM8904_ANALOGUE_ADC_0, 0, 1, 0),
-},
+SOC_SINGLE_EXT("ADC 128x OSR Switch", WM8904_ANALOGUE_ADC_0, 0, 1, 0,
+	snd_soc_get_volsw, wm8904_adc_osr_put),
 };
 
 static const char *drc_path_text[] = {
@@ -2111,8 +2106,8 @@ static const struct regmap_config wm8904_regmap = {
 	.num_reg_defaults = ARRAY_SIZE(wm8904_reg_defaults),
 };
 
-static __devinit int wm8904_i2c_probe(struct i2c_client *i2c,
-				      const struct i2c_device_id *id)
+static int wm8904_i2c_probe(struct i2c_client *i2c,
+			    const struct i2c_device_id *id)
 {
 	struct wm8904_priv *wm8904;
 	unsigned int val;
@@ -2247,7 +2242,7 @@ err_enable:
 	return ret;
 }
 
-static __devexit int wm8904_i2c_remove(struct i2c_client *client)
+static int wm8904_i2c_remove(struct i2c_client *client)
 {
 	snd_soc_unregister_codec(&client->dev);
 	return 0;
@@ -2267,7 +2262,7 @@ static struct i2c_driver wm8904_i2c_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe =    wm8904_i2c_probe,
-	.remove =   __devexit_p(wm8904_i2c_remove),
+	.remove =   wm8904_i2c_remove,
 	.id_table = wm8904_i2c_id,
 };
 
